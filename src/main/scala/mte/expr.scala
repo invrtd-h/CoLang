@@ -1,8 +1,11 @@
-package expr
+package mte
 
 import scala.annotation.targetName
 import scala.annotation.unused
+import scala.language.implicitConversions
+import scala.util.Random
 
+@unused
 sealed trait Expr {
   @unused
   def 배(rhs: Expr): Expr = BinaryOp(this, rhs, Ops.add.apply)
@@ -17,7 +20,7 @@ sealed trait Expr {
   @unused
   def 게이(template: String): Expr = Print(this, template)
   @unused
-  def 안아줘요(rhs: Expr): Expr = Seq(this, rhs)
+  def 케바바바밥줘(rhs: Expr): Expr = Seq(this, rhs)
 
   @unused
   @targetName("plus")
@@ -30,6 +33,7 @@ sealed trait Value
 type Env = Map[String, Value]
 
 // Exprs
+@unused
 case class Num(data: BigInt) extends Expr {
   @unused
   def 뭉: Num = Num(2 * data + 1)
@@ -62,7 +66,7 @@ case class Num(data: BigInt) extends Expr {
 }
 case class BinaryOp(lhs: Expr, rhs: Expr, op: (=> Value, => Value) => Value) extends Expr {
   override def toString: String =
-    s"BinaryOp(${lhs}, ${rhs})"
+    s"BinaryOp($lhs, $rhs)"
 }
 case class UnaryOp(x: Expr, op: (=> Value) => Value) extends Expr
 case class Id(name: String) extends Expr
@@ -82,7 +86,7 @@ case class NumV(data: BigInt) extends Value {
   override def toString: String = "%s".format(data)
 }
 case class CloV(argName: String, fExpr: Expr, var fEnv: Env) extends Value {
-  override def toString: String = s"CloV(${argName}, ${fExpr})"
+  override def toString: String = s"CloV($argName, $fExpr)"
 }
 
 case object Ops {
@@ -112,6 +116,7 @@ case object Ops {
   val div: BinaryOpNum = BinaryOpNum(_ / _, "Division")
 }
 
+@unused
 case class Program(var pEnv: Env) {
   def pret(expr: Expr): Value = {
     expr match {
@@ -121,7 +126,7 @@ case class Program(var pEnv: Env) {
       case Id(name) => pEnv.get(name) match {
         case Some(value) => value
         case _ => throw Exception(
-          s"얘! 네 눈에 \"${name}\"이(가) ${pEnv}에 있는 걸로 보이니?"
+          s"얘! 네 눈에 \"$name\"이(가) $pEnv 에 있는 걸로 보이니?"
         )
       }
       case ValDef(valName, initExpr) =>
@@ -137,7 +142,7 @@ case class Program(var pEnv: Env) {
           val program: Program = Program(fEnv + (argName -> argV))
           program.pret(fExpr)
         case err@_ => throw Exception(
-          s"얘! 지금 ${err} 이게 함수로 보이니?"
+          s"얘! 지금 $err 이게 함수로 보이니?"
         )
       }
       case Seq(lhs, rhs) =>
@@ -182,6 +187,8 @@ case class Program(var pEnv: Env) {
 (all letters, $, _)
 */
 
+implicit def toId(name: String): Expr = Id(name)
+
 @unused
 val 뭉: Num = Num(1)
 @unused
@@ -210,7 +217,6 @@ class StartProgram(var program: Program) {
     def apply(expr: Expr): Helper = {
       val result: Value = sp.program.pret(expr)
       println(result)
-      println(sp.program.pEnv)
       this
     }
 
@@ -266,11 +272,11 @@ case object 아니 {
 
   case class ValBuilder2(name: String, expr: Expr) {
     @unused
-    def 를(h: 했대.type): Expr =
+    def 를(@unused h: 했대.type): Expr =
       ValDef(name, expr)
 
     @unused
-    def 을(h: 했대.type): Expr =
+    def 을(@unused h: 했대.type): Expr =
       ValDef(name, expr)
   }
 }
@@ -282,32 +288,37 @@ case object 했대
 case object 아 {
   @unused
   @targetName("notFact")
-  def ~!(funName: String, argName: String): AppBuilder =
-    AppBuilder(funName, argName)
-  case class AppBuilder(funName: String, argName: String) {
+  def ~!(funName: String, argName: String): FunBuilder =
+    FunBuilder(funName, argName)
+
+  @unused
+  @targetName("notFact")
+  def ~!(argName: String): FunBuilder =
+    FunBuilder(utils.randomNameGen(), argName)
+  case class FunBuilder(funName: String, argName: String) {
     @unused
-    def 는(fExpr: Expr): AppBuilder2 =
-      AppBuilder2(funName, argName, fExpr)
+    def 는(fExpr: Expr): FunBuilder2 =
+      FunBuilder2(funName, argName, fExpr)
 
     @unused
-    def 은(fExpr: Expr): AppBuilder2 =
-      AppBuilder2(funName, argName, fExpr)
+    def 은(fExpr: Expr): FunBuilder2 =
+      FunBuilder2(funName, argName, fExpr)
   }
 
-  case class AppBuilder2(funName: String, argName: String, fExpr: Expr) {
+  case class FunBuilder2(funName: String, argName: String, fExpr: Expr) {
     @unused
-    def 이(x: 참.type): AppBuilder3 =
-      AppBuilder3(funName, argName, fExpr)
+    def 이(@unused x: 참.type): FunBuilder3 =
+      FunBuilder3(funName, argName, fExpr)
 
     @unused
-    def 가(x: 참.type): AppBuilder3 =
-      AppBuilder3(funName, argName, fExpr)
+    def 가(@unused x: 참.type): FunBuilder3 =
+      FunBuilder3(funName, argName, fExpr)
   }
 
-  case class AppBuilder3(funName: String, argName: String, fExpr: Expr) {
+  case class FunBuilder3(funName: String, argName: String, fExpr: Expr) {
     @unused
-    def 좋구나(x: EndState): Expr =
-      Fun(funName, argName, fExpr)
+    def 좋구나(@unused x: EndState): Expr =
+      Seq(ValDef(funName, Fun(funName, argName, fExpr)), Id(funName))
   }
 }
 
@@ -318,11 +329,16 @@ case object 참
 implicit class AppBuilder1(f: Expr) {
   def 아(arg: Expr): AppBuilder2 =
     AppBuilder2(f, arg)
+}
 
-  case class AppBuilder2(f: Expr, arg: Expr) {
-    def 먹어라(x: EndState2): Expr =
-      App(f, arg)
-  }
+case class AppBuilder2(f: Expr, arg: Expr) {
+  def 먹어라(@unused x: EndState2): Expr =
+    App(f, arg)
+}
+
+implicit class AppBuilder0(name: String) {
+  def 아(arg: Expr): AppBuilder2 =
+    AppBuilder2(Id(name), arg)
 }
 
 // (11수) (i) {}
@@ -332,4 +348,15 @@ implicit class BasicForHelper(n: Int) {
       Id(iterName) - Num(n),
       Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
     ))
+}
+
+// semantic box 생성
+// 박스 아저씨 {}
+
+val rand: Random = new Random()
+
+package utils {
+  @unused
+  def randomNameGen(): String =
+    s"%reserved%_${rand.nextLong()}%_%${rand.nextLong()}"
 }
