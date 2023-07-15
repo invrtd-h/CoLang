@@ -107,7 +107,7 @@ package mte {
 
   private case class App(fnExpr: Expr, argExpr: Expr) extends Expr
 
-  private case class AppBuiltin(fn: AppBuiltinFn, arg: Expr) extends Expr
+  private case class BuiltinCode(fn: () => Expr) extends Expr
 
   private case class Seq(lhs: Expr, rhs: Expr) extends Expr
 
@@ -164,23 +164,6 @@ package mte {
     val valGt = bigIntOpToValueOp(utility.gtInt)
   }
 
-  /**
-   * Value들끼리의 기본적인 단항/이항 연산을 제공한단다.
-   */
-
-  private case class AppBuiltinFn(fn: Value => Value, name: String) extends (Value => Value) {
-    def apply(arg: Value): Value = fn(arg)
-  }
-
-  object builtinfns {
-    @unused
-    def makePrintLn(template: String): AppBuiltinFn =
-      def fn(v: Value): Value =
-        println(template.format(v))
-        v
-      AppBuiltinFn(fn, "PrintLn")
-  }
-
   @unused
   case class Process(var pSto: Sto) {
     @unused
@@ -217,8 +200,8 @@ package mte {
             s"얘! 지금 $err 이게 함수로 보이니?"
           )
         }
-        case AppBuiltin(fn, arg) =>
-          fn(pret(arg))
+        case BuiltinCode(fn) =>
+          pret(fn())
         case Seq(lhs, rhs) =>
           pret(lhs); pret(rhs)
         case IfN0(cond, exprTrue, exprFalse) =>
@@ -428,16 +411,23 @@ package mte {
   implicit class AppBuilder1(f: Expr) {
     def 아(arg: Expr): AppBuilder2 =
       AppBuilder2(f, arg)
-  }
 
-  case class AppBuilder2(f: Expr, arg: Expr) {
-    def 먹어라(@unused x: EndState2): Expr =
-      App(f, arg)
+    @unused
+    def 야(arg: Expr): AppBuilder2 =
+      AppBuilder2(f, arg)
   }
 
   implicit class AppBuilder0(name: String) {
     def 아(arg: Expr): AppBuilder2 =
       AppBuilder2(Id(name), arg)
+
+    def 야(arg: Expr): AppBuilder2 =
+      AppBuilder2(Id(name), arg)
+  }
+
+  case class AppBuilder2(f: Expr, arg: Expr) {
+    def 먹어라(@unused x: EndState2): Expr =
+      App(f, arg)
   }
 
   // (11수) (i) {}
@@ -488,7 +478,17 @@ package mte {
       NewBox(expr)
   }
 
-  object utility {
+  package stl {
+    def readInt(): Expr =
+      Num(scala.io.StdIn.readInt)
+  }
+
+  // std input
+  // 개입
+  @unused
+  val 개입: Expr = BuiltinCode(stl.readInt)
+
+  package utility {
     private val rand: Random = new Random()
     @unused
     def randomNameGen(): String =
