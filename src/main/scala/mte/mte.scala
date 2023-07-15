@@ -3,20 +3,21 @@ package mte {
   import scala.annotation.unused
   import scala.language.implicitConversions
   import scala.util.Random
+  import scala.util.chaining._
 
   @unused
-  private[mte] sealed trait Expr {
+  private sealed trait Expr {
     @unused
-    def 배(rhs: Expr): Expr = BinaryOp(this, rhs, "Add", Ops.add.apply)
+    def 배(rhs: Expr): Expr = BinaryOp(this, rhs, "Add", ops.valAdd)
 
     @unused
-    def 코(rhs: Expr): Expr = BinaryOp(this, rhs, "Sub", Ops.sub.apply)
+    def 코(rhs: Expr): Expr = BinaryOp(this, rhs, "Sub", ops.valSub)
 
     @unused
-    def 조이고(rhs: Expr): Expr = BinaryOp(this, rhs, "Mul", Ops.mul.apply)
+    def 조이고(rhs: Expr): Expr = BinaryOp(this, rhs, "Mul", ops.valMul)
 
     @unused
-    def 법회(rhs: Expr): Expr = BinaryOp(this, rhs, "Div", Ops.div.apply)
+    def 법회(rhs: Expr): Expr = BinaryOp(this, rhs, "Div", ops.valDiv)
 
     @unused
     def 릴(rhs: Expr): Expr = App(rhs, this)
@@ -26,28 +27,28 @@ package mte {
 
     @unused
     def 케바바바밥줘(rhs: Expr): Expr = Seq(this, rhs)
-    
+
     @unused
     def 겸상(rhs: Expr): Expr = Pair(this, rhs)
 
     @unused
     @targetName("plus")
-    def +(rhs: Expr): Expr = BinaryOp(this, rhs, "plus", Ops.add.apply)
+    def +(rhs: Expr): Expr = BinaryOp(this, rhs, "plus", ops.valAdd)
 
     @unused
     @targetName("minus")
-    def -(rhs: Expr): Expr = BinaryOp(this, rhs, "minus", Ops.sub.apply)
+    def -(rhs: Expr): Expr = BinaryOp(this, rhs, "minus", ops.valSub)
   }
 
-  private[mte] sealed trait Value
+  private sealed trait Value
 
-  private[mte] type Env = Map[String, Value]
-  private[mte] type Addr = Int
-  private[mte] type Sto = Map[Addr, Value]
+  private type Env = Map[String, Value]
+  private type Addr = Int
+  private type Sto = Map[Addr, Value]
 
   // Expressions
   @unused
-  private[mte] case class Num(data: BigInt) extends Expr {
+  private case class Num(data: BigInt) extends Expr {
     @unused
     def 뭉: Num = Num(2 * data + 1)
 
@@ -91,85 +92,93 @@ package mte {
     def 탱탱탱: Num = Num(8 * data)
   }
 
-  private[mte] case class BinaryOp(lhs: Expr, rhs: Expr, name: String, op: (=> Value, => Value) => Value) extends Expr {
+  private case class BinaryOp(lhs: Expr, rhs: Expr, name: String, op: (=> Value, => Value) => Value) extends Expr {
     override def toString: String =
       s"BO[$name]($lhs, $rhs)"
   }
 
-  private[mte] case class UnaryOp(x: Expr, op: (=> Value) => Value) extends Expr
+  private case class UnaryOp(x: Expr, op: (=> Value) => Value) extends Expr
 
-  private[mte] case class Id(name: String) extends Expr
+  private case class Id(name: String) extends Expr
 
-  private[mte] case class ValDef(valName: String, initExpr: Expr) extends Expr
+  private case class ValDef(valName: String, initExpr: Expr) extends Expr
 
-  private[mte] case class Fun(funName: String, argName: String, fExpr: Expr) extends Expr
+  private case class Fun(funName: String, argName: String, fExpr: Expr) extends Expr
 
-  private[mte] case class App(fnExpr: Expr, argExpr: Expr) extends Expr
-  private[mte] case class AppBuiltin(fn: Value => Value, arg: Expr) extends Expr
+  private case class App(fnExpr: Expr, argExpr: Expr) extends Expr
 
-  private[mte] case class Seq(lhs: Expr, rhs: Expr) extends Expr
+  private case class AppBuiltin(fn: AppBuiltinFn, arg: Expr) extends Expr
 
-  private[mte] case class IfN0(cond: Expr, exprTrue: Expr, exprFalse: Expr) extends Expr
+  private case class Seq(lhs: Expr, rhs: Expr) extends Expr
 
-  private[mte] case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
+  private case class IfN0(cond: Expr, exprTrue: Expr, exprFalse: Expr) extends Expr
 
-  private[mte] case class Print(exprPrint: Expr, template: String) extends Expr
-  
-  private[mte] case class UnitE() extends Expr
-  
-  private[mte] case class Pair(firstExpr: Expr, secondExpr: Expr) extends Expr
-  
-  private[mte] case class NewBox(initExpr: Expr) extends Expr
+  private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
+
+  private case class Print(exprPrint: Expr, template: String) extends Expr
+
+  private case class UnitE() extends Expr
+
+  private case class Pair(firstExpr: Expr, secondExpr: Expr) extends Expr
+
+  private case class NewBox(initExpr: Expr) extends Expr
 
   // Values
-  private[mte] case class UnitV() extends Value {
+  private case class UnitV() extends Value {
     override def toString: String = ""
   }
 
-  private[mte] case class NumV(data: BigInt) extends Value {
+  private case class NumV(data: BigInt) extends Value {
     override def toString: String = "%s".format(data)
   }
 
-  private[mte] case class CloV(argName: String, fExpr: Expr, var fEnv: Env) extends Value {
+  private case class CloV(argName: String, fExpr: Expr, var fEnv: Env) extends Value {
     override def toString: String = s"CloV($argName, $fExpr)"
   }
 
-  private[mte] case class PairV(first: Value, second: Value) extends Value
-  
-  private[mte] case class BoxV(addr: Addr) extends Value
+  private case class PairV(first: Value, second: Value) extends Value
 
-  private[mte] case object Ops {
-    @unused
-    case class UnaryOpNum(op: BigInt => BigInt, name: String) {
-      def apply(x: => Value): Value = x match {
-        case NumV(data) => NumV(this.op(data))
-        case _ => throw Exception(s"${this.name} failed ### x=$x")
-      }
-    }
+  private case class BoxV(addr: Addr) extends Value
 
-    @unused
-    case class BinaryOpNum(op: (BigInt, BigInt) => BigInt, name: String) {
-      def apply(lhs: => Value, rhs: => Value): Value = {
+  package ops {
+    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): ((=> Value, => Value) => Value) =
+      def ret(lhs: => Value, rhs: => Value): Value = {
         lhs match {
           case NumV(dataL) => rhs match {
-            case NumV(dataR) => NumV(this.op(dataL, dataR))
+            case NumV(dataR) => NumV(op(dataL, dataR))
             case _ => throw Exception(
-              s"얘! ${this.name} 여기 지금 $rhs 이게 숫자로 보이니??"
+              s"얘! 여기 지금 $rhs 이게 숫자로 보이니??"
             )
           }
           case _ => throw Exception(
-            s"얘! ${this.name} 여기 지금 $lhs 이게 숫자로 보이니??"
+            s"얘! 여기 지금 $lhs 이게 숫자로 보이니??"
           )
         }
       }
-    }
+      ret
 
-    val add: BinaryOpNum = BinaryOpNum(_ + _, "Addition")
-    val sub: BinaryOpNum = BinaryOpNum(_ - _, "Subtraction")
-    val mul: BinaryOpNum = BinaryOpNum(_ * _, "Multiplication")
-    val div: BinaryOpNum = BinaryOpNum(_ / _, "Division")
-    val le: BinaryOpNum = BinaryOpNum(mteUtil.leInt, "Le")
-    val gt: BinaryOpNum = BinaryOpNum(mteUtil.gtInt, "Gt")
+    val valAdd = bigIntOpToValueOp(_ + _)
+    val valSub = bigIntOpToValueOp(_ - _)
+    val valMul = bigIntOpToValueOp(_ * _)
+    val valDiv = bigIntOpToValueOp(_ / _)
+    val valGt = bigIntOpToValueOp(utility.gtInt)
+  }
+
+  /**
+   * Value들끼리의 기본적인 단항/이항 연산을 제공한단다.
+   */
+
+  private case class AppBuiltinFn(fn: Value => Value, name: String) extends (Value => Value) {
+    def apply(arg: Value): Value = fn(arg)
+  }
+
+  object builtinfns {
+    @unused
+    def makePrintLn(template: String): AppBuiltinFn =
+      def fn(v: Value): Value =
+        println(template.format(v))
+        v
+      AppBuiltinFn(fn, "PrintLn")
   }
 
   @unused
@@ -283,7 +292,7 @@ package mte {
   val 뭉탱뭉: Num = Num(5)
   @unused
   val 뭉탱탱: Num = Num(4)
-  
+
   @unused
   val 스키비야: UnitE = UnitE()
   @unused
@@ -307,13 +316,13 @@ package mte {
     def 케바바바밥줘: Expr => Program = apply
   }
 
-  private[mte] class EndState
+  private class EndState
 
   @targetName("endState")
   @unused
   val ~! = EndState()
 
-  private[mte] class EndState2
+  private class EndState2
 
   @targetName("endState2")
   @unused
@@ -374,7 +383,6 @@ package mte {
 
   // Fun
   // 아~! ()는 ()이 참 좋구나~!
-
   case object 아 {
     @unused
     @targetName("notFact")
@@ -384,7 +392,7 @@ package mte {
     @unused
     @targetName("notFact")
     def ~!(argName: String): FunBuilder =
-      FunBuilder(mteUtil.randomNameGen(), argName)
+      FunBuilder(utility.randomNameGen(), argName)
 
     case class FunBuilder(funName: String, argName: String) {
       @unused
@@ -455,7 +463,7 @@ package mte {
   case class GtBuilder2(lhs: Expr, rhs: Expr) {
     @unused
     def 원에(@unused x: EndState2): Expr =
-      BinaryOp(lhs, rhs, "Gt", Ops.gt.apply)
+      BinaryOp(lhs, rhs, "Gt", ops.valGt)
   }
 
   @unused
@@ -465,28 +473,32 @@ package mte {
       GtBuilder2(Id(lhs), rhs)
   }
 
-  // semantic box 생성
-  // 박스 아저씨 {}
+  // scope 생성
+  // 문법은 아직 모르겠다 맨이야
+  @unused
   def makeNewScope(expr: Expr): Expr =
-    App(Fun(mteUtil.randomNameGen(), mteUtil.randomNameGen(), expr), Num(0))
+    App(Fun(utility.randomNameGen(), utility.randomNameGen(), expr), Num(0))
 
+  // box 생성
+  // 박스 아저씨 ()
   @unused
   case object 박스 {
     @unused
     def 아저씨(expr: Expr): Expr =
-      makeNewScope(expr)
+      NewBox(expr)
   }
 
-  // utility package
-  package mteUtil {
-    val rand: Random = new Random()
+  object utility {
+    private val rand: Random = new Random()
     @unused
     def randomNameGen(): String =
       s"%reserved%_${rand.nextLong()}%_%${rand.nextLong()}"
 
+    @unused
     def leInt(lhs: BigInt, rhs: BigInt): Int =
       if (lhs <= rhs) 1 else 0
 
+    @unused
     def gtInt(lhs: BigInt, rhs: BigInt): Int =
       if (lhs > rhs) 1 else 0
   }
