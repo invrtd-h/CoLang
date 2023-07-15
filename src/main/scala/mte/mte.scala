@@ -122,6 +122,8 @@ package mte {
   private case class Pair(firstExpr: Expr, secondExpr: Expr) extends Expr
 
   private case class NewBox(initExpr: Expr) extends Expr
+  private case class OpenBox(box: Expr) extends Expr
+  private case class SetBox(box: Expr, assignExpr: Expr) extends Expr
 
   // Values
   private case class UnitV() extends Value {
@@ -238,6 +240,23 @@ package mte {
           val addr: Addr = parentProcess.pSto.keys.maxOption.getOrElse(0) + 1
           parentProcess.pSto += (addr -> pret(initExpr))
           BoxV(addr)
+        case OpenBox(box) =>
+          pret(box) match {
+            case BoxV(addr) => parentProcess.pSto(addr)
+            case err@_ => throw Exception(
+              s"얘! 지금 $err 이게 빡스로 보이니? 죽여벌랑"
+            )
+          }
+        case SetBox(box, assignExpr) =>
+          pret(box) match {
+            case BoxV(addr) =>
+              val toAssign: Value = pret(assignExpr)
+              parentProcess.pSto += (addr -> toAssign)
+              toAssign
+            case err@_ => throw Exception(
+              s"얘! 지금 $err 이게 빡스로 보이니? 죽여벌랑"
+            )
+          }
       }
     }
   }
@@ -257,6 +276,12 @@ package mte {
   (all letters, $, _)
   */
 
+  /**
+   * 옛날 버전에서는 를! 함수를 사용해서 명시적으로 변수에 들어 있는 값을
+   * 꺼내와야 했다 맨이야! 이제는 그럴 필요가 없다맨
+   * @param name 변수명
+   * @return 그 아이디에 저장된 값
+   */
   implicit def toId(name: String): Expr = Id(name)
 
   @unused
@@ -284,12 +309,13 @@ package mte {
   def 춘잣 =
     ProgramBuilder(Process(Map()))
 
-  private[mte] case class ProgramBuilder(var process: Process) {
+  private case class ProgramBuilder(var process: Process) {
     @targetName("fact")
+    @unused
     def ! : Program =
       Program(process, ProcessFunc(process, Map()))
   }
-  case class Program(process: Process, mainFn: ProcessFunc) {
+  private case class Program(process: Process, mainFn: ProcessFunc) {
     def apply(expr: Expr): Program = {
       val result: Value = mainFn.pret(expr)
       println(result)
@@ -297,6 +323,7 @@ package mte {
       this
     }
 
+    @unused
     def 케바바바밥줘: Expr => Program = apply
   }
 
@@ -320,7 +347,10 @@ package mte {
     def !(valName: String): Expr = Id(valName)
   }
 
-  // 유링게슝한.? (val) {stmt} 안유링게슝 {stmt}
+  /**
+   * 주어진 조건이 유링게슝하면 앞부분을, 유링게슝하지 않으면 뒷부분을 실행한단다. 뒷부분은 안돼 임마!
+   * 문법: (유링게슝한?) (expr) {expr} 안유링게슝 {expr}
+   */
   @unused
   case object 유링게슝한 {
     @targetName("question")
@@ -334,8 +364,10 @@ package mte {
     }
   }
 
-  // ValDef
-  // 아니 자기가 (x) 라는사람인데 () 를 했대
+  /**
+   * 얘! 변수 사용이 잘 안 되니? 이걸로 변수를 정의해 보렴!
+   * 문법: 아니 자기가 (id)라는 사람인데 {expr}을 했대
+   */
   @unused
   case object 아니 {
     @unused
@@ -365,8 +397,10 @@ package mte {
 
   case object 했대
 
-  // Fun
-  // 아~! ()는 ()이 참 좋구나~!
+  /**
+   * 함수를 정의한단다. 함수 리터럴이라 다른 함수에 인자로 넘겨줄 수도 있고 정의한 즉시 쓸 수도 있단다.
+   * 문법: 아~! (("fnName", "argName") / ("argName"))은/는 (expr)이/가 참 좋구나~!
+   */
   case object 아 {
     @unused
     @targetName("notFact")
@@ -407,8 +441,11 @@ package mte {
 
   case object 참
 
-  // App
-  // ()아 () 먹어라??
+  /**
+   * 케인인님 함수호출 한판해요
+   * 문법: (f)아/야 (arg) 먹어라??
+   * @param f 호출할 함수
+   */
   implicit class AppBuilder1(f: Expr) {
     def 아(arg: Expr): AppBuilder2 =
       AppBuilder2(f, arg)
@@ -443,7 +480,7 @@ package mte {
   }
 
   /**
-   * 케인님이 11수의 경험을 살려 해당 문장을 원하는 만큼 실행시켜 준단다!
+   * 케인인님이 11수의 경험을 살려 해당 문장을 원하는 만큼 실행시켜 준단다!
    * 문법: ((정수)수) (iterName) {expr}
    */
   implicit class BasicForHelper(n: Int) {
@@ -457,8 +494,11 @@ package mte {
       )
   }
 
-  // gt
-  // () 돈 ()원에??
+  /**
+   * 도네 금액이 케인인님의 마음에 들지 판단한단다.
+   * 문법: (lhs) 돈 (rhs) 원에??
+   * @param lhs lhs
+   */
   @unused
   implicit class GtBuilder(lhs: Expr) {
     @unused
@@ -500,13 +540,25 @@ package mte {
       Num(scala.io.StdIn.readInt)
   }
 
-  // std input
-  // 개입
+  /**
+   * stdin에서 정수를 읽어온단다.
+   * 정수 말고 다른 문자는 이따 쉬는시간에 감사하다고 할게~
+   */
   @unused
   val 개입: Expr = BuiltinCode(stl.readInt)
 
   package utility {
+    // 구현에 쓸모 있는 잡탱이들을 모아놓은 라이브러리란다!
+
+    /**
+     *
+     */
     private val rand: Random = new Random()
+
+    /**
+     * 프로그램이 내부적으로 사용하는 변수 이름은 이 함수가 부여해 준단다.
+     * @return 변수 이름
+     */
     @unused
     def randomNameGen(): String =
       s"%reserved%_${rand.nextLong()}%_%${rand.nextLong()}"
@@ -515,6 +567,12 @@ package mte {
     def leInt(lhs: BigInt, rhs: BigInt): Int =
       if (lhs <= rhs) 1 else 0
 
+    /**
+     * 얘! 내가 이런 함수까지 일일이 다 주석을 달아야 되니? 귀찮아!
+     * @param lhs 아 귀찮아~~~!!!!!
+     * @param rhs 아 귀찮아~~~!!!!!
+     * @return
+     */
     @unused
     def gtInt(lhs: BigInt, rhs: BigInt): Int =
       if (lhs > rhs) 1 else 0

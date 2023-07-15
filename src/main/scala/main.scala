@@ -1,11 +1,14 @@
 import mte._
 import scala.language.postfixOps
 
+import scala.annotation.unused
+
 @main
 def main(): Unit = {
   구구단()
 }
 
+@unused
 def 입력받기(): Unit = {
   춘잣! {
     아니 자기가 "함수" 라는사람인데 {
