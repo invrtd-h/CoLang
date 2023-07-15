@@ -40,7 +40,9 @@ package mte {
     def -(rhs: Expr): Expr = BinaryOp(this, rhs, "minus", ops.valSub)
   }
 
-  private sealed trait Value
+  private sealed trait Value {
+    sealed trait Add
+  }
 
   private type Env = Map[String, Value]
   private type Addr = Int
@@ -533,6 +535,11 @@ package mte {
     @unused
     def 아저씨(expr: Expr): Expr =
       NewBox(expr)
+  }
+
+  @unused
+  object 주제넘은 {
+
   }
 
   package stl {
