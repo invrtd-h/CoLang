@@ -3,7 +3,7 @@ import scala.language.postfixOps
 
 @main
 def main(): Unit = {
-  입력받기()
+  구구단()
 }
 
 def 입력받기(): Unit = {

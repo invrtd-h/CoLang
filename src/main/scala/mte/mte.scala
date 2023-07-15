@@ -141,7 +141,7 @@ package mte {
   private case class BoxV(addr: Addr) extends Value
 
   package ops {
-    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): ((=> Value, => Value) => Value) =
+    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Value =
       def ret(lhs: => Value, rhs: => Value): Value = {
         lhs match {
           case NumV(dataL) => rhs match {
@@ -293,6 +293,7 @@ package mte {
     def apply(expr: Expr): Program = {
       val result: Value = mainFn.pret(expr)
       println(result)
+      println(mainFn.pEnv)
       this
     }
 
@@ -430,14 +431,30 @@ package mte {
       App(f, arg)
   }
 
-  // (11수) (i) {}
+  /**
+   * 케인님이 조건문이 거짓이 되기 전까지 강제연결을 해 주신단다!
+   * 문법: 강제연결 (cond) {expr}
+   * @param cond 조건문
+   * @param exprIn 조건문이 참인 동안 실행할 명령
+   */
+  @unused
+  def 강제연결(cond: Expr)(exprIn: Expr): Expr = {
+    WhileN0(cond, exprIn)
+  }
+
+  /**
+   * 케인님이 11수의 경험을 살려 해당 문장을 원하는 만큼 실행시켜 준단다!
+   * 문법: ((정수)수) (iterName) {expr}
+   */
   implicit class BasicForHelper(n: Int) {
     @unused
     def 수(iterName: String)(forExpr: Expr): Expr =
-      Seq(ValDef(iterName, Num(0)), WhileN0(
-        Id(iterName) - Num(n),
-        Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
-      ))
+      makeNewScope(
+        Seq(ValDef(iterName, Num(0)), WhileN0(
+          Id(iterName) - Num(n),
+          Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
+        ))
+      )
   }
 
   // gt
