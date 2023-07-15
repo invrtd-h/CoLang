@@ -4,8 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/sbt.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/sbt.xml" afterDir="false" />
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="i">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/expr.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/expr.scala" afterDir="false" />
@@ -85,12 +84,26 @@
       <workItem from="1689146507193" duration="1112000" />
       <workItem from="1689147835352" duration="5663000" />
       <workItem from="1689172380425" duration="35507000" />
-      <workItem from="1689327636941" duration="8107000" />
+      <workItem from="1689327636941" duration="13016000" />
+      <workItem from="1689377845615" duration="3005000" />
+      <workItem from="1689386523588" duration="25000" />
     </task>
+    <task id="LOCAL-00001" summary="i">
+      <created>1689354448161</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1689354448161</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="i" />
+    <option name="LAST_COMMIT_MESSAGE" value="i" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
