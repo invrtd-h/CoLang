@@ -56,11 +56,7 @@ package mte {
     def /-/(rhs: RHS): Value
   }
 
-  trait AutoConvert[T <: Value] {
-    def convertTo: T
-  }
-
-  type Env = Map[String, Value]
+  type Env = Map[String, Addr]
   type Addr = Int
   type Sto = Map[Addr, Value]
 
@@ -117,8 +113,6 @@ package mte {
       s"BO[$name]($lhs, $rhs)"
   }
 
-  private case class UnaryOp(x: Expr, op: (=> Value) => Value) extends Expr
-
   private case class Id(name: String) extends Expr
 
   private case class ValDef(valName: String, initExpr: Expr) extends Expr
@@ -140,10 +134,6 @@ package mte {
   private case class Print(exprPrint: Expr, template: String) extends Expr
 
   private case class Pair(firstExpr: Expr, secondExpr: Expr) extends Expr
-
-  private case class NewBox(initExpr: Expr) extends Expr
-  private case class OpenBox(box: Expr) extends Expr
-  private case class SetBox(box: Expr, assignExpr: Expr) extends Expr
 
   // Values
   private case class UnitV() extends Value {
@@ -206,11 +196,16 @@ package mte {
   }
 
   @unused
-  case class Process(var pSto: Sto) {
+  case class Process(var pSto: Sto, private var nextAddr: Addr = 0) {
     @unused
     def pret(expr: Expr): Value = {
       val func = ProcessFunc(this, Map())
       func.pret(expr)
+    }
+
+    def giveNextAddr: Addr = {
+      nextAddr += 1
+      nextAddr
     }
   }
 
@@ -220,24 +215,35 @@ package mte {
         case Num(data) => NumV(data)
         case UnitE() => UnitV()
         case BinaryOp(lhs, rhs, _, op) => op(pret(lhs), pret(rhs))
-        case UnaryOp(x, op) => op(pret(x))
         case Id(name) => pEnv.get(name) match {
-          case Some(value) => value
+          case Some(addr) => parentProcess.pSto.get(addr) match {
+            case Some(value) => value
+            case _ => throw error.MteRuntimeErr(
+              s"얘! 컴파일쟁이(${parentProcess.pSto})들은 주소값 $addr 이런 거 잘 몰라 임마!"
+            )
+          }
           case _ => throw error.MteRuntimeErr(
             s"얘! 컴파일쟁이($pEnv)들은 $name 이런 거 잘 몰라 임마!"
           )
         }
         case ValDef(valName, initExpr) =>
-          pEnv += (valName -> pret(initExpr))
+          val initV: Value = pret(initExpr)
+          val addr: Addr = parentProcess.giveNextAddr
+          pEnv += (valName -> addr)
+          parentProcess.pSto += (addr -> initV)
           UnitV()
         case Fun(funName, argName, fExpr) =>
           val ret: CloV = CloV(argName, fExpr, pEnv)
-          ret.fEnv += (funName -> ret)
+          val addr: Addr = parentProcess.giveNextAddr
+          parentProcess.pSto += (addr -> ret)
+          ret.fEnv += (funName -> addr)
           ret
         case App(fnExpr, argExpr) => pret(fnExpr) match {
           case CloV(argName, fExpr, fEnv) =>
             val argV: Value = pret(argExpr)
-            val newFunc: ProcessFunc = ProcessFunc(this.parentProcess, fEnv + (argName -> argV))
+            val addr: Addr = parentProcess.giveNextAddr
+            parentProcess.pSto += (addr -> argV)
+            val newFunc: ProcessFunc = ProcessFunc(parentProcess, fEnv + (argName -> addr))
             newFunc.pret(fExpr)
           case err@_ => throw error.MteRuntimeErr(
             s"얘! 지금 $err 이게 함수로 보이니?"
@@ -598,8 +604,7 @@ package mte {
   @unused
   case object 박스 {
     @unused
-    def 아저씨(expr: Expr): Expr =
-      NewBox(expr)
+    def 아저씨(expr: Expr): Expr = ???
   }
 
   /**
@@ -688,10 +693,9 @@ package mte {
   }
 
   package error {
-    /**
-     * MTELang의 런타임 에러란다.
-     * @param msg 에러 메시지
-     */
-    case class MteRuntimeErr(msg: String) extends Exception
+
+    final case class MteRuntimeErr(private val message: String = "",
+                                   private val cause: Throwable = None.orNull)
+      extends Exception(message, cause)
   }
 }
