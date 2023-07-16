@@ -1,11 +1,33 @@
+# MTELang
+
+Scala 3 내부에서 돌릴 수 있는 작은 프로그래밍 언어예요~
+
+### 문법
+
+### 예제
+
+#### 구구단 출력하기
+
+```scala
 import mte._
 import scala.language.postfixOps
-import scala.annotation.unused
 
-@main
-def main(): Unit = {
-  ㄴ찍기()
+def 구구단(): Unit = {
+  춘잣! {
+    (11수) ("i") {
+      (11수) ("j") {
+        "i" 조이고 "j" 리액션 "%s\t"
+      } 리액션 "\n"
+    }
+  }
 }
+```
+
+#### ㄴ 찍기
+
+```scala
+import mte._
+import scala.language.postfixOps
 
 def ㄴ찍기(): Unit = {
   춘잣! {
@@ -24,17 +46,13 @@ def ㄴ찍기(): Unit = {
     }
   }
 }
+```
 
-@unused
-def test2(): Unit = {
-  춘잣! {
-    아니 자기가 "함수" 라는사람인데 {
-      아~! "변수" 는 ("변수" 배 뭉탱뭉) 이 참 좋구나~!
-    } 를 했대
-  } 케바바바밥줘 {
-    "함수"야 뭉탱뭉 먹어라??
-  }
-}
+#### 팩토리얼 계산하기
+
+```scala
+import mte._
+import scala.language.postfixOps
 
 def 팩토리얼(): Unit = {
   춘잣! {
@@ -51,30 +69,4 @@ def 팩토리얼(): Unit = {
     }
   }
 }
-
-def 구구단(): Unit = {
-  춘잣! {
-    (11수) ("i") {
-      (11수) ("j") {
-        "i" 조이고 "j" 리액션 "%s\t"
-      } 리액션 "\n"
-    }
-  }
-}
-
-def test1(): Unit = {
-  춘잣! {
-    정품 맞어 {
-      주제넘은? {
-        뭉 아 뭉탱 먹어라??
-      }
-    }
-  }
-}
-
-class TestValidator(var n: Int = 0) {
-  def validate(f: () => Unit): Unit =
-    f()
-    println("test %d validated".format(n))
-    n += 1
-}
+```
