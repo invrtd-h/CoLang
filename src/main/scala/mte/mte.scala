@@ -6,7 +6,7 @@ package mte {
   import scala.util.chaining._
 
   @unused
-  private sealed trait Expr {
+  sealed trait Expr {
     @unused
     def 배(rhs: Expr): Expr = BinaryOp(this, rhs, "Add", ops.valAdd)
 
@@ -40,17 +40,33 @@ package mte {
     def -(rhs: Expr): Expr = BinaryOp(this, rhs, "minus", ops.valSub)
   }
 
-  private sealed trait Value {
-    sealed trait Add
+  sealed trait Value
+
+  trait Arithmetic[RHS <: Value] {
+    @targetName("add")
+    def ++(rhs: RHS): Value
+
+    @targetName("sub")
+    def --(rhs: RHS): Value
+
+    @targetName("mul")
+    def **(rhs: RHS): Value
+
+    @targetName("div")
+    def /-/(rhs: RHS): Value
   }
 
-  private type Env = Map[String, Value]
-  private type Addr = Int
-  private type Sto = Map[Addr, Value]
+  trait AutoConvert[T <: Value] {
+    def convertTo: T
+  }
+
+  type Env = Map[String, Value]
+  type Addr = Int
+  type Sto = Map[Addr, Value]
 
   // Expressions
   @unused
-  private case class Num(data: BigInt) extends Expr {
+  case class Num(data: BigInt) extends Expr {
     @unused
     def 뭉: Num = Num(2 * data + 1)
 
@@ -94,6 +110,8 @@ package mte {
     def 탱탱탱: Num = Num(8 * data)
   }
 
+  case class UnitE() extends Expr
+
   private case class BinaryOp(lhs: Expr, rhs: Expr, name: String, op: (=> Value, => Value) => Value) extends Expr {
     override def toString: String =
       s"BO[$name]($lhs, $rhs)"
@@ -109,7 +127,7 @@ package mte {
 
   private case class App(fnExpr: Expr, argExpr: Expr) extends Expr
 
-  private case class BuiltinCode(fn: () => Expr) extends Expr
+  private case class BuiltinCode(fn: Expr => Expr, arg: Expr) extends Expr
 
   private case class Seq(lhs: Expr, rhs: Expr) extends Expr
 
@@ -117,9 +135,9 @@ package mte {
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
-  private case class Print(exprPrint: Expr, template: String) extends Expr
+  private case class Try(exprTry: Expr) extends Expr
 
-  private case class UnitE() extends Expr
+  private case class Print(exprPrint: Expr, template: String) extends Expr
 
   private case class Pair(firstExpr: Expr, secondExpr: Expr) extends Expr
 
@@ -132,8 +150,24 @@ package mte {
     override def toString: String = ""
   }
 
-  private case class NumV(data: BigInt) extends Value {
+  private case class NumV(data: BigInt) extends Value, Arithmetic[NumV] {
     override def toString: String = "%s".format(data)
+
+    @targetName("add")
+    override def ++(rhs: NumV): Value = NumV(data + rhs.data)
+
+    @targetName("sub")
+    override def --(rhs: NumV): Value = NumV(data - rhs.data)
+
+    @targetName("mul")
+    override def **(rhs: NumV): Value = NumV(data * rhs.data)
+
+    @targetName("div")
+    override def /-/(rhs: NumV): Value = NumV(data / rhs.data)
+  }
+
+  private case class BoolV(data: Boolean) extends Value {
+    override def toString: String = if (data) "true" else "false"
   }
 
   private case class CloV(argName: String, fExpr: Expr, var fEnv: Env) extends Value {
@@ -145,21 +179,24 @@ package mte {
   private case class BoxV(addr: Addr) extends Value
 
   package ops {
-    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Value =
+    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Value = {
       def ret(lhs: => Value, rhs: => Value): Value = {
         lhs match {
           case NumV(dataL) => rhs match {
             case NumV(dataR) => NumV(op(dataL, dataR))
-            case _ => throw Exception(
+            case _ => throw error.MteRuntimeErr(
               s"얘! 여기 지금 $rhs 이게 숫자로 보이니??"
             )
           }
-          case _ => throw Exception(
+          case _ => throw error.MteRuntimeErr(
             s"얘! 여기 지금 $lhs 이게 숫자로 보이니??"
           )
         }
       }
+
       ret
+    }
+
 
     val valAdd = bigIntOpToValueOp(_ + _)
     val valSub = bigIntOpToValueOp(_ - _)
@@ -171,21 +208,23 @@ package mte {
   @unused
   case class Process(var pSto: Sto) {
     @unused
-    def pret(expr: Expr): Value =
+    def pret(expr: Expr): Value = {
       val func = ProcessFunc(this, Map())
       func.pret(expr)
+    }
   }
 
   case class ProcessFunc(parentProcess: Process, var pEnv: Env) {
     def pret(expr: Expr): Value = {
       expr match {
         case Num(data) => NumV(data)
+        case UnitE() => UnitV()
         case BinaryOp(lhs, rhs, _, op) => op(pret(lhs), pret(rhs))
         case UnaryOp(x, op) => op(pret(x))
         case Id(name) => pEnv.get(name) match {
           case Some(value) => value
-          case _ => throw Exception(
-            s"얘! 네 눈에 \"$name\"이(가) $pEnv 에 있는 걸로 보이니?"
+          case _ => throw error.MteRuntimeErr(
+            s"얘! 컴파일쟁이($pEnv)들은 $name 이런 거 잘 몰라 임마!"
           )
         }
         case ValDef(valName, initExpr) =>
@@ -200,19 +239,19 @@ package mte {
             val argV: Value = pret(argExpr)
             val newFunc: ProcessFunc = ProcessFunc(this.parentProcess, fEnv + (argName -> argV))
             newFunc.pret(fExpr)
-          case err@_ => throw Exception(
+          case err@_ => throw error.MteRuntimeErr(
             s"얘! 지금 $err 이게 함수로 보이니?"
           )
         }
-        case BuiltinCode(fn) =>
-          pret(fn())
+        case BuiltinCode(fn, expr) =>
+          pret(fn(expr))
         case Seq(lhs, rhs) =>
           pret(lhs); pret(rhs)
         case IfN0(cond, exprTrue, exprFalse) =>
           pret(cond) match {
             case NumV(data) =>
               if (data != 0) pret(exprTrue) else pret(exprFalse)
-            case err@_ => throw Exception(
+            case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
             )
           }
@@ -220,7 +259,7 @@ package mte {
           val act = (condExpr: Expr) => {
             pret(condExpr) match {
               case NumV(data) => data
-              case err@_ => throw Exception(
+              case err@_ => throw error.MteRuntimeErr(
                 s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
               )
             }
@@ -231,11 +270,17 @@ package mte {
             condVal = act(cond)
           }
           UnitV()
+        case Try(exprTry) =>
+          try {
+            pret(exprTry)
+            NumV(1)
+          } catch {
+            case _: error.MteRuntimeErr => NumV(0)
+          }
         case Print(exprPrint, template) =>
           val value = pret(exprPrint)
           print(template.format(value))
           value
-        case UnitE() => UnitV()
         case Pair(firstExpr, secondExpr) =>
           PairV(pret(firstExpr), pret(secondExpr))
         case NewBox(initExpr) =>
@@ -245,7 +290,7 @@ package mte {
         case OpenBox(box) =>
           pret(box) match {
             case BoxV(addr) => parentProcess.pSto(addr)
-            case err@_ => throw Exception(
+            case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 빡스로 보이니? 죽여벌랑"
             )
           }
@@ -255,7 +300,7 @@ package mte {
               val toAssign: Value = pret(assignExpr)
               parentProcess.pSto += (addr -> toAssign)
               toAssign
-            case err@_ => throw Exception(
+            case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 빡스로 보이니? 죽여벌랑"
             )
           }
@@ -308,20 +353,18 @@ package mte {
   @unused
   val 스킵이야: UnitE = UnitE()
 
-  def 춘잣 =
+  def 춘잣: ProgramBuilder =
     ProgramBuilder(Process(Map()))
 
-  private case class ProgramBuilder(var process: Process) {
+  case class ProgramBuilder(var process: Process) {
     @targetName("fact")
     @unused
     def ! : Program =
       Program(process, ProcessFunc(process, Map()))
   }
-  private case class Program(process: Process, mainFn: ProcessFunc) {
+  case class Program(process: Process, mainFn: ProcessFunc) {
     def apply(expr: Expr): Program = {
       val result: Value = mainFn.pret(expr)
-      println(result)
-      println(mainFn.pEnv)
       this
     }
 
@@ -329,13 +372,13 @@ package mte {
     def 케바바바밥줘: Expr => Program = apply
   }
 
-  private class EndState
+  case class EndState()
 
   @targetName("endState")
   @unused
   val ~! = EndState()
 
-  private class EndState2
+  case class EndState2()
 
   @targetName("endState2")
   @unused
@@ -485,12 +528,34 @@ package mte {
    * 케인인님이 11수의 경험을 살려 해당 문장을 원하는 만큼 실행시켜 준단다!
    * 문법: ((정수)수) (iterName) {expr}
    */
-  implicit class BasicForHelper(n: Int) {
+  implicit class BasicForBuilder(n: Int) {
     @unused
     def 수(iterName: String)(forExpr: Expr): Expr =
       makeNewScope(
         Seq(ValDef(iterName, Num(0)), WhileN0(
           Id(iterName) - Num(n),
+          Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
+        ))
+      )
+  }
+
+  implicit class ForBuilder(time: Expr) {
+    @unused
+    def 수(iterName: String)(forExpr: Expr): Expr =
+      makeNewScope(
+        Seq(ValDef(iterName, Num(0)), WhileN0(
+          Id(iterName) - time,
+          Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
+        ))
+      )
+  }
+
+  implicit class IdForBuilder(id: String) {
+    @unused
+    def 수(iterName: String)(forExpr: Expr): Expr =
+      makeNewScope(
+        Seq(ValDef(iterName, Num(0)), WhileN0(
+          Id(iterName) - Id(id),
           Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
         ))
       )
@@ -537,14 +602,51 @@ package mte {
       NewBox(expr)
   }
 
+  /**
+   * 내부 식이 문법적으로 올바른 식이면 1, 아니면 0을 리턴한단다.
+   * 문법: 주제넘은? {expr}
+   */
   @unused
   object 주제넘은 {
+    @unused
+    @targetName("question")
+    def ? (expr: Expr): Expr =
+      Try(expr)
+  }
 
+  /**
+   * Assertion 구문이란다!
+   * 문법: 정품 맞어 {}
+   */
+  @unused
+  object 정품 {
+    @unused
+    def 맞어(expr: Expr): Expr = {
+      IfN0(expr, UnitE(), BuiltinCode(stl.makeKillFn(
+        s"얘! $expr 이게 truthy 한 값이 되겠니??"
+      ), UnitE()))
+    }
   }
 
   package stl {
+    // MTELang의 표준 라이브러리란다!
     def readInt(): Expr =
       Num(scala.io.StdIn.readInt)
+
+    def unify(f: () => Expr): Expr => Expr = {
+      def ret(@unused unitE: Expr): Expr = f()
+
+      ret
+    }
+
+
+    def makeKillFn(msg: String): Expr => Expr = {
+      def ret(@unused unitE: Expr): Expr =
+        assert(false, msg)
+
+      ret
+    }
+
   }
 
   /**
@@ -552,7 +654,7 @@ package mte {
    * 정수 말고 다른 문자는 이따 쉬는시간에 감사하다고 할게~
    */
   @unused
-  val 개입: Expr = BuiltinCode(stl.readInt)
+  val 개입: Expr = BuiltinCode(stl.unify(stl.readInt), UnitE())
 
   package utility {
     // 구현에 쓸모 있는 잡탱이들을 모아놓은 라이브러리란다!
@@ -583,5 +685,13 @@ package mte {
     @unused
     def gtInt(lhs: BigInt, rhs: BigInt): Int =
       if (lhs > rhs) 1 else 0
+  }
+
+  package error {
+    /**
+     * MTELang의 런타임 에러란다.
+     * @param msg 에러 메시지
+     */
+    case class MteRuntimeErr(msg: String) extends Exception
   }
 }

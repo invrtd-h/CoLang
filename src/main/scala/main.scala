@@ -1,11 +1,24 @@
 import mte._
 import scala.language.postfixOps
-
 import scala.annotation.unused
 
 @main
 def main(): Unit = {
-  구구단()
+  춘잣! {
+    아니 자기가 "n" 이라는사람인데 개입 을 했대
+  } 케바바바밥줘 {
+    ("n" 조이고 뭉탱탱 수) ("i") {
+      ("n"수) ("j") {
+        스키비야 게이 "@"
+      } 게이 "\n"
+    }
+  } 케바바바밥줘 {
+    ("n"수) ("i") {
+      ("n" 조이고 뭉탱뭉 수) ("j") {
+        스키비야 게이 "@"
+      } 게이 "\n"
+    }
+  }
 }
 
 @unused
@@ -43,4 +56,21 @@ def 구구단(): Unit = {
       } 게이 "\n"
     }
   }
+}
+
+def test1(): Unit = {
+  춘잣! {
+    정품 맞어 {
+      주제넘은? {
+        뭉 아 뭉탱 먹어라??
+      }
+    }
+  }
+}
+
+class TestValidator(var n: Int = 0) {
+  def validate(f: () => Unit): Unit =
+    f()
+    println("test %d validated".format(n))
+    n += 1
 }
