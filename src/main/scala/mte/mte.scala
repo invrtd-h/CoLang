@@ -3,7 +3,7 @@ package mte {
   import scala.annotation.unused
   import scala.language.implicitConversions
   import scala.util.Random
-  import scala.util.chaining._
+  import scala.util.chaining.*
 
   @unused
   sealed trait Expr {
@@ -28,11 +28,9 @@ package mte {
     @unused
     def 케바바바밥줘(rhs: Expr): Expr = Seq(this, rhs)
 
-    @unused
     @targetName("plus")
     def +(rhs: Expr): Expr = BinaryOp(this, rhs, "plus", ops.valAdd)
 
-    @unused
     @targetName("minus")
     def -(rhs: Expr): Expr = BinaryOp(this, rhs, "minus", ops.valSub)
   }
@@ -51,7 +49,7 @@ package mte {
 
   private case class BinaryOp(lhs: Expr, rhs: Expr, name: String, op: (=> Value, => Value) => Value) extends Expr {
     override def toString: String =
-      s"BO[$name]($lhs, $rhs)"
+      s"BO<$name>($lhs, $rhs)"
   }
 
   private case class Id(name: String) extends Expr
@@ -68,9 +66,15 @@ package mte {
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
+  private case class Ptr(expr: Expr) extends Expr
+
+  private case class SetPtr(ptr: Expr, setExpr: Expr) extends Expr
+
   private case class Try(exprTry: Expr) extends Expr
 
-  private case class BuiltinFnE2E(fn: Expr => Expr, arg: Expr) extends Expr
+  private case class BuiltinFnE2E(fn: Expr => Expr, arg: Expr, name: String) extends Expr {
+    override def toString: String = s"BF<$name>($arg)"
+  }
 
   private case class BuiltinFnV2V(fn: Value => Value, arg: Expr) extends Expr
 
@@ -88,7 +92,21 @@ package mte {
     override def toString: String = s"CloV($argName, $fExpr)"
   }
 
-  private case class PtrV(addr: Addr) extends Value
+  private case class PtrV(addr: Addr) extends Value {
+    /**
+     * 자~ 가짜 주소를 만들었어요~
+     * 가짜 주소는 진짜 주소처럼 이렇게 잘 돼 있지 않아 딱 한줄서기 그런 게 아니고
+     * 동인천역 앞에 동인천역 앞에 쯥 그냥 뭉탱이로 있단 말이야
+     * @return 가짜 주소를 16진수로 변환한 문자열
+     */
+    override def toString: String = {
+      val newAddr = {
+        val newAddr = (utility.pow(913, addr + 20) * 998244353) >>> 12
+        newAddr - (newAddr % 8)
+      }
+      f"*[0x$newAddr%16x]"
+    }
+  }
 
   package ops {
     def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Value = {
@@ -149,6 +167,9 @@ package mte {
           )
         }
         case ValDef(valName, initExpr) =>
+          if (valName.contains("킹") || valName.contains("갓")) {
+            throw error.MteRuntimeErr("내가 킹하고 갓하고 함부로 막 붙이지 말라 그랬지!!")
+          }
           val initV: Value = pret(initExpr)
           val addr: Addr = parentProcess.giveNextAddr
           pEnv += (valName -> addr)
@@ -196,6 +217,27 @@ package mte {
             condVal = act(cond)
           }
           UnitV()
+        case Ptr(expr) => expr match {
+          case Id(id) => pEnv.get(id) match {
+            case Some(addr) => PtrV(addr)
+            case None => throw error.MteRuntimeErr(
+              s"얘! 컴파일쟁이($pEnv)들은 $id 이런 거 잘 몰라 임마!"
+            )
+          }
+          case _ => throw error.MteRuntimeErr(
+            s"얘! $expr 지금 이게 lvalue가 되겠니??"
+          )
+        }
+        case SetPtr(ptr, setExpr) =>
+          val setVal = pret(setExpr)
+          pret(ptr) match {
+            case PtrV(addr) =>
+              parentProcess.pSto += (addr -> setVal)
+              setVal
+            case err@_ => throw error.MteRuntimeErr(
+              s"얘! 지금 네 눈에 $err 이게 포인터로 보이니?"
+            )
+          }
         case Try(exprTry) =>
           try {
             pret(exprTry)
@@ -203,22 +245,22 @@ package mte {
           } catch {
             case _: error.MteRuntimeErr => NumV(0)
           }
-        case BuiltinFnE2E(fn, arg) => pret(fn(arg))
+        case BuiltinFnE2E(fn, arg, _) => pret(fn(arg))
         case BuiltinFnV2V(fn, arg) => fn(pret(arg))
       }
     }
   }
-  
+
   package sugarbuilder {
     def makeNewScope(expr: Expr): Expr =
       App(Fun(utility.randomNameGen(), utility.randomNameGen(), expr), UnitE())
-      
-    def makePrintExpr(expr: Expr, template: String = "%s"): Expr = 
+
+    def makePrintExpr(expr: Expr, template: String = "%s"): Expr =
       BuiltinFnV2V(v => builtin.write(v, template), expr)
-      
-    def makeScopedWhile(condExpr: Expr, inExpr: Expr): Expr = ???
-    
-    def makeScopedFor(): Expr = ???
+
+    def makeScopedWhile(condExpr: Expr, inExpr: Expr): Expr = makeNewScope(WhileN0(condExpr, inExpr))
+
+
   }
 
   /*
@@ -304,7 +346,6 @@ package mte {
 
   case class ProgramBuilder(var process: Process) {
     @targetName("fact")
-    @unused
     def ! : Program =
       Program(process, ProcessFunc(process, Map()))
   }
@@ -365,7 +406,7 @@ package mte {
    * 문법: 아니 자기가 (id)라는 사람인데 {expr}을 했대
    */
   @unused val 아니세상에: ValBuilderInit = ValBuilderInit()
-  
+
   case class ValBuilderInit() {
     @unused
     def 자기가(name: String): ValBuilder =
@@ -556,7 +597,7 @@ package mte {
    * 문법: 주제넘은? {expr}
    */
   @unused
-  object 주제넘은 {
+  case object 주제넘은 {
     @unused
     @targetName("question")
     def ? (expr: Expr): Expr =
@@ -568,17 +609,55 @@ package mte {
    * 문법: 정품 맞어 {}
    */
   @unused
-  object 정품 {
+  case object 정품 {
     @unused
     def 맞어(expr: Expr): Expr = {
       IfN0(expr, UnitE(), BuiltinFnE2E(utility.makeKillFn(
         s"얘! $expr 이게 truthy 한 값이 되겠니??"
-      ), UnitE()))
+      ), UnitE(), "kill"))
     }
   }
 
+  implicit class PtrBuilder(expr: Expr) {
+    @unused
+    def 발행(@unused nft: NFT.type): Expr = Ptr(expr)
+  }
+
+  implicit class PtrBuilderFromStr(name: String) {
+    @unused
+    def 발행(@unused nft: NFT.type): Expr = Ptr(Id(name))
+  }
+
+  case object NFT
+  
+  implicit class PtrSetBuilder(ptr: Expr) {
+    @unused def 게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(ptr)
+    
+    @unused def 니게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(ptr)
+    
+  }
+  
+  implicit class PtrSetBuilderFromStr(name: String) {
+    @unused def 게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(Id(name))
+
+    @unused def 니게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(Id(name))
+  }
+
+  case class PtrSetBuilder2(ptr: Expr) {
+    @unused def 사람이(setExpr: Expr): PtrSetBuilder3 = PtrSetBuilder3(ptr, setExpr)
+  }
+
+  case class PtrSetBuilder3(ptr: Expr, setExpr: Expr) {
+    @unused def 일(@unused x: 순없는지.type): Expr = SetPtr(ptr, setExpr)
+
+    @unused def 힐(@unused x: 순없는지.type): Expr = SetPtr(ptr, setExpr)
+  }
+  
+  @unused case object 그런
+  @unused case object 순없는지
+
   /**
-   * 랜덤이 필요하면 윷놀이 를! 조이도록 해요~
+   * 랜덤이 필요하면 윷놀이 를! 아침까지 조이도록 해요~
    */
   @unused
   val 윷놀이: Expr = Num(utility.randBetween(1, 6))
@@ -588,7 +667,7 @@ package mte {
    * 정수 말고 다른 문자는 이따 쉬는시간에 감사하다고 할게~
    */
   @unused
-  val 개입: Expr = BuiltinFnE2E(builtin.readInt, UnitE())
+  val 개입: Expr = BuiltinFnE2E(builtin.readInt, UnitE(), "readInt")
 
   /**
    * 나는! 나는! 나는! stdout으로 출력을 했다!
@@ -599,21 +678,21 @@ package mte {
    */
   @unused
   def 리액션(expr: Expr, template: String = "%s"): Expr = sugarbuilder.makePrintExpr(expr, template)
-  
+
   package builtin {
     def readInt(@unused expr: Expr = UnitE()): Expr =
       Num(scala.io.StdIn.readInt)
-      
+
     def write(value: Value, template: String): Value = {
       print(template.format(value))
       value
     }
-      
+
   }
 
   package utility {
     /**
-     * 
+     *
      */
     private val rand: Random = new Random()
 
@@ -623,7 +702,7 @@ package mte {
      */
     def randomNameGen(): String =
       s"%reserved%_${rand.nextString(21)}%_%"
-      
+
     def randBetween(lbdInclusive: Int, ubdExclusive: Int): Int =
       rand.between(lbdInclusive, ubdExclusive)
 
@@ -646,6 +725,18 @@ package mte {
         assert(false, msg)
         unitE
 
+      ret
+    }
+
+    def pow(x: Long, power: Long): Long = {
+      var x_ = x
+      var pw = power
+      var ret = x_
+      while (pw > 0) {
+        if (pw % 2 == 1) ret = ret * x_
+        x_ = x_ * x_
+        pw /= 2
+      }
       ret
     }
   }
