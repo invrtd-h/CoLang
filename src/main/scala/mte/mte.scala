@@ -1,32 +1,12 @@
 package mte {
-  import scala.annotation.{targetName, unused, tailrec}
+  import scala.annotation.{tailrec, targetName, unused}
   import scala.language.implicitConversions
   import scala.util.Random
   import scala.util.chaining.*
+  import utility.Piper
 
   @unused
   sealed trait Expr {
-    @unused
-    def 배(rhs: Expr): Expr = BinaryOp(this, rhs, "Add", ops.valAdd)
-
-    @unused
-    def 코(rhs: Expr): Expr = BinaryOp(this, rhs, "Sub", ops.valSub)
-
-    @unused
-    def 조이고(rhs: Expr): Expr = BinaryOp(this, rhs, "Mul", ops.valMul)
-
-    @unused
-    def 법회(rhs: Expr): Expr = BinaryOp(this, rhs, "Div", ops.valDiv)
-
-    @unused
-    def 릴(rhs: Expr): Expr = App(rhs, this)
-
-    @unused
-    def 리액션(template: String): Expr = sugarbuilder.makePrintExpr(this, template)
-
-    @unused
-    def 케바바바밥줘(rhs: Expr): Expr = Seq(this, rhs)
-
     @targetName("plus")
     def +(rhs: Expr): Expr = BinaryOp(this, rhs, "plus", ops.valAdd)
 
@@ -36,7 +16,7 @@ package mte {
 
   sealed trait Value
 
-  type Env = Map[String, Addr]
+  type Env = Map[String, Value]
   type Addr = Int
   type Sto = Map[Addr, Value]
 
@@ -65,9 +45,9 @@ package mte {
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
-  private case class Ref(expr: Expr) extends Expr
+  private case class NewBox(initExpr: Expr) extends Expr
 
-  private case class SetRef(ref: Expr, setExpr: Expr) extends Expr
+  private case class SetBox(box: Expr, setExpr: Expr) extends Expr
 
   private case class Try(exprTry: Expr) extends Expr
 
@@ -91,7 +71,7 @@ package mte {
     override def toString: String = s"CloV($argName, $fExpr)"
   }
 
-  private case class RefV(addr: Addr) extends Value {
+  private case class BoxV(addr: Addr) extends Value {
     /**
      * 자~ 가짜 주소를 만들었어요~
      * 가짜 주소는 진짜 주소처럼 이렇게 잘 돼 있지 않아 딱 한줄서기 그런 게 아니고
@@ -125,13 +105,13 @@ package mte {
 
       ret
     }
-
-
+    
     val valAdd = bigIntOpToValueOp(_ + _)
     val valSub = bigIntOpToValueOp(_ - _)
     val valMul = bigIntOpToValueOp(_ * _)
     val valDiv = bigIntOpToValueOp(_ / _)
     val valGt  = bigIntOpToValueOp(utility.gtInt)
+    val valLogNot = bigIntOpToValueOp(utility.logNot)
   }
 
   @unused
@@ -149,18 +129,22 @@ package mte {
   }
 
   case class ProcessFn(parentProcess: Process, var pEnv: Env) {
+
     @tailrec
-    private def helpUnSeq(expr: Expr): Expr = expr match {
-      case Seq(_, rhs) => helpUnSeq(rhs)
-      case _ => expr
+    private def unbox(value: Value): Value = value match {
+      case BoxV(addr) => parentProcess.pSto.get(addr) match {
+        case Some(value) => unbox(value)
+        case None => throw error.MteRuntimeErr(
+          s"얘! 컴파일쟁이(${parentProcess.pSto})들은 $addr 이런 거 잘 몰라 임마!"
+        )
+      }
+      case _ => value
     }
 
     private def fnCall(fnExpr: Expr, argExpr: Expr): Value = pret(fnExpr) match {
       case CloV(argName, fExpr, fEnv) =>
-        val argV: Value = pret(argExpr)
-        val addr: Addr = parentProcess.giveNextAddr
-        parentProcess.pSto += (addr -> argV)
-        val newFn: ProcessFn = ProcessFn(parentProcess, fEnv + (argName -> addr))
+        val argV: Value = pret(argExpr) |> unbox
+        val newFn: ProcessFn = ProcessFn(parentProcess, fEnv + (argName -> argV))
         newFn.pret(fExpr)
       case err@_ => throw error.MteRuntimeErr(
         s"얘! 지금 $err 이게 함수로 보이니?"
@@ -170,51 +154,42 @@ package mte {
     def pret(expr: Expr): Value = {
       expr match {
         case Num(data) => NumV(data)
-        case UnitE() => UnitV()
-        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs), pret(rhs))
+        case UnitE() => unitV
+        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> unbox, pret(rhs) |> unbox)
         case Id(name) => pEnv.get(name) match {
-          case Some(addr) => parentProcess.pSto.get(addr) match {
-            case Some(value) => value
-            case _ => throw error.MteRuntimeErr(
-              s"얘! 컴파일쟁이(${parentProcess.pSto})들은 주소값 $addr 이런 거 잘 몰라 임마!"
-            )
-          }
+          case Some(value) => value
           case _ => throw error.MteRuntimeErr(
             s"얘! 컴파일쟁이($pEnv)들은 $name 이런 거 잘 몰라 임마!"
           )
         }
         case ValDef(valName, initExpr) =>
-          if (valName.contains("킹") || valName.contains("갓")) {
+          if (valName.contains("킹") && valName.contains("갓")) {
             throw error.MteRuntimeErr("내가 킹하고 갓하고 함부로 막 붙이지 말라 그랬지!!")
           }
-          val initV: Value = pret(initExpr)
-          val addr: Addr = parentProcess.giveNextAddr
-          pEnv += (valName -> addr)
-          parentProcess.pSto += (addr -> initV)
-          UnitV()
+          val initV: Value = pret(initExpr) |> unbox
+          pEnv += (valName -> initV)
+          initV
         case Fun(funName, argName, fExpr) =>
           val ret: CloV = CloV(argName, fExpr, pEnv)
-          val addr: Addr = parentProcess.giveNextAddr
-          parentProcess.pSto += (addr -> ret)
-          ret.fEnv += (funName -> addr)
+          ret.fEnv += (funName -> ret)
           ret
         case App(fnExpr, argExpr) => fnCall(fnExpr, argExpr)
         case Seq(lhs, rhs) =>
           pret(lhs); pret(rhs)
         case IfN0(cond, exprTrue, exprFalse) =>
-          pret(cond) match {
+          pret(cond) |> unbox match {
             case NumV(data) =>
               if (data != 0)
-                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprTrue), UnitE())
+                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprTrue), unitE)
               else
-                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprFalse), UnitE())
+                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprFalse), unitE)
             case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
             )
           }
         case WhileN0(cond, exprIn) =>
           val act = (condExpr: Expr) => {
-            pret(condExpr) match {
+            pret(condExpr) |> unbox match {
               case NumV(data) => data
               case err@_ => throw error.MteRuntimeErr(
                 s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
@@ -226,22 +201,16 @@ package mte {
             pret(exprIn)
             condVal = act(cond)
           }
-          UnitV()
-        case Ref(expr) => helpUnSeq(expr) match {
-          case Id(id) => pEnv.get(id) match {
-            case Some(addr) => RefV(addr)
-            case None => throw error.MteRuntimeErr(
-              s"얘! 컴파일쟁이($pEnv)들은 $id 이런 거 잘 몰라 임마!"
-            )
-          }
-          case _ => throw error.MteRuntimeErr(
-            s"얘! $expr 지금 이게 lvalue가 되겠니??"
-          )
-        }
-        case SetRef(ref, setExpr) =>
-          val setVal = pret(setExpr)
+          unitV
+        case NewBox(initExpr) =>
+          val initV: Value = pret(initExpr) |> unbox
+          val addr: Addr = parentProcess.giveNextAddr
+          parentProcess.pSto += (addr -> initV)
+          BoxV(addr)
+        case SetBox(ref, setExpr) =>
+          val setVal = pret(setExpr) |> unbox
           pret(ref) match {
-            case RefV(addr) =>
+            case BoxV(addr) =>
               parentProcess.pSto += (addr -> setVal)
               setVal
             case err@_ => throw error.MteRuntimeErr(
@@ -261,9 +230,12 @@ package mte {
     }
   }
 
+  val unitE: UnitE = UnitE()
+  val unitV: UnitV = UnitV()
+
   package sugarbuilder {
     def makeNewScope(expr: Expr): Expr =
-      App(Fun(utility.randomNameGen(), utility.randomNameGen(), expr), UnitE())
+      App(Fun(utility.randomNameGen(), utility.randomNameGen(), expr), unitE)
 
     def makePrintExpr(expr: Expr, template: String = "%s"): Expr =
       BuiltinFnV2V(v => builtin.write(v, template), expr)
@@ -339,6 +311,38 @@ package mte {
     def 탱탱탱: Num = Num(8 * data.data)
   }
 
+  class ExprOps(lhs: Expr) {
+    @unused def 배(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Add", ops.valAdd)
+
+    @unused def 코(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Sub", ops.valSub)
+
+    @unused def 조이고(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Mul", ops.valMul)
+
+    @unused def 법회(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Div", ops.valDiv)
+
+    @unused def 릴(rhs: Expr): Expr = App(rhs, lhs)
+
+    @unused def 리액션(template: String): Expr = sugarbuilder.makePrintExpr(lhs, template)
+
+    @unused def 케바바바밥줘(rhs: Expr): Expr = Seq(lhs, rhs)
+    
+    @unused def 꼽표(@unused rhs: EndState3): Expr = BinaryOp(lhs, Num(0), "LogNot", ops.valLogNot)
+  }
+  
+  @unused
+  @targetName("bitNotBitNot")
+  val ~~ = EndState3()
+
+  implicit class ExprOpsExtByExpr(lhs: Expr) extends ExprOps(lhs)
+  implicit class ExprOpsExtByStr(lhs: String) extends ExprOps(Id(lhs))
+  implicit class ExprOpsExtByNum(lhs: Int) extends ExprOps(Num(lhs))
+
+  class EndState
+  class EndState1 extends EndState
+  class EndState2 extends EndState
+  class EndState3 extends EndState
+  
+
   @unused val 뭉: Num = Num(1)
   @unused val 탱: Num = Num(0)
   @unused val 뭉뭉: Num = Num(3)
@@ -348,37 +352,37 @@ package mte {
   @unused val 뭉탱뭉: Num = Num(5)
   @unused val 뭉탱탱: Num = Num(4)
 
-  @unused val 스키비야: UnitE = UnitE()
-  @unused val 스킵이야: UnitE = UnitE()
+  @unused val 스키비야: UnitE = unitE
+  @unused val 스킵이야: UnitE = unitE
 
-  def 춘잣: ProgramBuilder =
-    ProgramBuilder(Process(Map()))
-
-  case class ProgramBuilder(var process: Process) {
-    @targetName("fact")
-    def ! : Program =
-      Program(process, ProcessFn(process, Map()))
+  def 춘잣: ProgramBuilder = {
+    val process: Process = Process(Map())
+    val program: Program = Program(process, ProcessFn(process, Map()))
+    ProgramBuilder(program)
   }
-  case class Program(process: Process, mainFn: ProcessFn) {
-    def apply(expr: Expr): Program = {
-      val result: Value = mainFn.pret(expr)
-      this
-    }
+
+  case class ProgramBuilder(program: Program) {
+    @targetName("fact")
+    @unused
+    def ! (expr: Expr) : ProgramBuilder = factHelper(expr)
 
     @unused
-    def 케바바바밥줘: Expr => Program = apply
+    def 케바바바밥줘(expr: Expr): ProgramBuilder = factHelper(expr)
+
+    private def factHelper(expr: Expr): ProgramBuilder = {
+      val result: Value = program.mainFn.pret(expr)
+      this
+    }
   }
-
-  case class EndState()
-
-  @targetName("endState")
+  case class Program(process: Process, mainFn: ProcessFn)
+  
   @unused
-  val ~! = EndState()
+  @targetName("notFact")
+  val ~! = EndState1()
+  
 
-  case class EndState2()
-
-  @targetName("endState2")
   @unused
+  @targetName("quesQues")
   val ?? = EndState2()
 
   // 를! "x"
@@ -628,14 +632,22 @@ package mte {
     }
   }
 
-  implicit class PtrBuilder(expr: Expr) {
+  @unused
+  implicit class BoxBuilder(expr: Expr) {
     @unused
-    def 발행(@unused nft: NFT.type): Expr = Ref(expr)
+    def 발행(@unused nft: NFT.type): Expr = NewBox(expr)
   }
 
-  implicit class PtrBuilderFromStr(name: String) {
+  @unused
+  implicit class BoxBuilderFromID(name: String) {
     @unused
-    def 발행(@unused nft: NFT.type): Expr = Ref(Id(name))
+    def 발행(@unused nft: NFT.type): Expr = NewBox(Id(name))
+  }
+
+  @unused
+  implicit class BoxBuilderFromNumber(num: Int) {
+    @unused
+    def 발행(@unused nft: NFT.type): Expr = NewBox(Num(num))
   }
 
   case object NFT
@@ -658,9 +670,9 @@ package mte {
   }
 
   case class PtrSetBuilder3(ptr: Expr, setExpr: Expr) {
-    @unused def 일(@unused x: 순없는지.type): Expr = SetRef(ptr, setExpr)
+    @unused def 일(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
 
-    @unused def 힐(@unused x: 순없는지.type): Expr = SetRef(ptr, setExpr)
+    @unused def 힐(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
   }
 
   @unused case object 그런
@@ -701,6 +713,12 @@ package mte {
   }
 
   package utility {
+    implicit class Piper[F](val value: F) {
+      @unused
+      @targetName("pipe")
+      def |>[G](f: F => G): G = f(value)
+    }
+
     /**
      *
      */
@@ -726,9 +744,11 @@ package mte {
      * @param rhs 아 귀찮아~~~!!!!!
      * @return
      */
-    @unused
-    def gtInt(lhs: BigInt, rhs: BigInt): Int =
+    def gtInt(lhs: BigInt, rhs: BigInt): BigInt =
       if (lhs > rhs) 1 else 0
+      
+    def logNot(lhs: BigInt, @unused rhs: BigInt): BigInt =
+      if (lhs == 0) 1 else 0
 
     def makeKillFn(msg: String): Expr => Expr = {
       def ret(unitE: Expr): Expr =

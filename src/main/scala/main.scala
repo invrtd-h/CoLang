@@ -4,7 +4,12 @@ import scala.annotation.unused
 
 @main
 def main(): Unit = {
+  구구단()
   팩토리얼()
+
+  val vd: TestValidator = TestValidator()
+  vd.validate(test1)
+  vd.validate(test2)
 }
 
 def 포인터실험(): Unit = {
@@ -85,12 +90,12 @@ def test1(): Unit = {
     정품 맞어 {
       주제넘은? {
         뭉 아 뭉탱 먹어라??
-      }
+      } 꼽표~~
     }
   }
 }
 
-class TestValidator(var n: Int = 0) {
+class TestValidator(var n: Int = 1) {
   def validate(f: () => Unit): Unit =
     f()
     println("test %d validated".format(n))

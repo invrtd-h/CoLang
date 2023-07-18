@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="포인터 추가 중">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="If문 블럭 처리 완료, 다시 Box oriented expression으로 돌아가야 할 것 같음">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
     </list>
@@ -94,7 +93,7 @@
       <workItem from="1689468832407" duration="776000" />
       <workItem from="1689487533502" duration="8000" />
       <workItem from="1689487544982" duration="1000" />
-      <workItem from="1689491830639" duration="34305000" />
+      <workItem from="1689491830639" duration="40610000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -180,11 +179,29 @@
       <option name="project" value="LOCAL" />
       <updated>1689585718883</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="If문 블럭 처리 완료, 다시 Box oriented expression으로 돌아가야 할 것 같음">
+      <created>1689668856043</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1689668856043</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="i" />
@@ -192,7 +209,8 @@
     <MESSAGE value="assertion 구문 추가" />
     <MESSAGE value="모든 변수가 수정 가능" />
     <MESSAGE value="포인터 추가 중" />
-    <option name="LAST_COMMIT_MESSAGE" value="포인터 추가 중" />
+    <MESSAGE value="If문 블럭 처리 완료, 다시 Box oriented expression으로 돌아가야 할 것 같음" />
+    <option name="LAST_COMMIT_MESSAGE" value="If문 블럭 처리 완료, 다시 Box oriented expression으로 돌아가야 할 것 같음" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
