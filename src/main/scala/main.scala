@@ -4,6 +4,10 @@ import scala.annotation.unused
 
 @main
 def main(): Unit = {
+  팩토리얼()
+}
+
+def 포인터실험(): Unit = {
   춘잣! {
     아니세상에 자기가 "케인" 이라는사람인데 -3000 를 했대
   } 케바바바밥줘 {

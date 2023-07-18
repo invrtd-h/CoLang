@@ -1,6 +1,5 @@
 package mte {
-  import scala.annotation.targetName
-  import scala.annotation.unused
+  import scala.annotation.{targetName, unused, tailrec}
   import scala.language.implicitConversions
   import scala.util.Random
   import scala.util.chaining.*
@@ -66,9 +65,9 @@ package mte {
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
-  private case class Ptr(expr: Expr) extends Expr
+  private case class Ref(expr: Expr) extends Expr
 
-  private case class SetPtr(ptr: Expr, setExpr: Expr) extends Expr
+  private case class SetRef(ref: Expr, setExpr: Expr) extends Expr
 
   private case class Try(exprTry: Expr) extends Expr
 
@@ -81,7 +80,7 @@ package mte {
 
   // Values
   private case class UnitV() extends Value {
-    override def toString: String = ""
+    override def toString: String = "UnitV"
   }
 
   private case class NumV(data: BigInt) extends Value {
@@ -92,7 +91,7 @@ package mte {
     override def toString: String = s"CloV($argName, $fExpr)"
   }
 
-  private case class PtrV(addr: Addr) extends Value {
+  private case class RefV(addr: Addr) extends Value {
     /**
      * 자~ 가짜 주소를 만들었어요~
      * 가짜 주소는 진짜 주소처럼 이렇게 잘 돼 있지 않아 딱 한줄서기 그런 게 아니고
@@ -139,7 +138,7 @@ package mte {
   case class Process(var pSto: Sto, private var nextAddr: Addr = 0) {
     @unused
     def pret(expr: Expr): Value = {
-      val func = ProcessFunc(this, Map())
+      val func = ProcessFn(this, Map())
       func.pret(expr)
     }
 
@@ -149,7 +148,25 @@ package mte {
     }
   }
 
-  case class ProcessFunc(parentProcess: Process, var pEnv: Env) {
+  case class ProcessFn(parentProcess: Process, var pEnv: Env) {
+    @tailrec
+    private def helpUnSeq(expr: Expr): Expr = expr match {
+      case Seq(_, rhs) => helpUnSeq(rhs)
+      case _ => expr
+    }
+
+    private def fnCall(fnExpr: Expr, argExpr: Expr): Value = pret(fnExpr) match {
+      case CloV(argName, fExpr, fEnv) =>
+        val argV: Value = pret(argExpr)
+        val addr: Addr = parentProcess.giveNextAddr
+        parentProcess.pSto += (addr -> argV)
+        val newFn: ProcessFn = ProcessFn(parentProcess, fEnv + (argName -> addr))
+        newFn.pret(fExpr)
+      case err@_ => throw error.MteRuntimeErr(
+        s"얘! 지금 $err 이게 함수로 보이니?"
+      )
+    }
+
     def pret(expr: Expr): Value = {
       expr match {
         case Num(data) => NumV(data)
@@ -181,23 +198,16 @@ package mte {
           parentProcess.pSto += (addr -> ret)
           ret.fEnv += (funName -> addr)
           ret
-        case App(fnExpr, argExpr) => pret(fnExpr) match {
-          case CloV(argName, fExpr, fEnv) =>
-            val argV: Value = pret(argExpr)
-            val addr: Addr = parentProcess.giveNextAddr
-            parentProcess.pSto += (addr -> argV)
-            val newFunc: ProcessFunc = ProcessFunc(parentProcess, fEnv + (argName -> addr))
-            newFunc.pret(fExpr)
-          case err@_ => throw error.MteRuntimeErr(
-            s"얘! 지금 $err 이게 함수로 보이니?"
-          )
-        }
+        case App(fnExpr, argExpr) => fnCall(fnExpr, argExpr)
         case Seq(lhs, rhs) =>
           pret(lhs); pret(rhs)
         case IfN0(cond, exprTrue, exprFalse) =>
           pret(cond) match {
             case NumV(data) =>
-              if (data != 0) pret(exprTrue) else pret(exprFalse)
+              if (data != 0)
+                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprTrue), UnitE())
+              else
+                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprFalse), UnitE())
             case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
             )
@@ -217,9 +227,9 @@ package mte {
             condVal = act(cond)
           }
           UnitV()
-        case Ptr(expr) => expr match {
+        case Ref(expr) => helpUnSeq(expr) match {
           case Id(id) => pEnv.get(id) match {
-            case Some(addr) => PtrV(addr)
+            case Some(addr) => RefV(addr)
             case None => throw error.MteRuntimeErr(
               s"얘! 컴파일쟁이($pEnv)들은 $id 이런 거 잘 몰라 임마!"
             )
@@ -228,10 +238,10 @@ package mte {
             s"얘! $expr 지금 이게 lvalue가 되겠니??"
           )
         }
-        case SetPtr(ptr, setExpr) =>
+        case SetRef(ref, setExpr) =>
           val setVal = pret(setExpr)
-          pret(ptr) match {
-            case PtrV(addr) =>
+          pret(ref) match {
+            case RefV(addr) =>
               parentProcess.pSto += (addr -> setVal)
               setVal
             case err@_ => throw error.MteRuntimeErr(
@@ -347,9 +357,9 @@ package mte {
   case class ProgramBuilder(var process: Process) {
     @targetName("fact")
     def ! : Program =
-      Program(process, ProcessFunc(process, Map()))
+      Program(process, ProcessFn(process, Map()))
   }
-  case class Program(process: Process, mainFn: ProcessFunc) {
+  case class Program(process: Process, mainFn: ProcessFn) {
     def apply(expr: Expr): Program = {
       val result: Value = mainFn.pret(expr)
       this
@@ -620,23 +630,23 @@ package mte {
 
   implicit class PtrBuilder(expr: Expr) {
     @unused
-    def 발행(@unused nft: NFT.type): Expr = Ptr(expr)
+    def 발행(@unused nft: NFT.type): Expr = Ref(expr)
   }
 
   implicit class PtrBuilderFromStr(name: String) {
     @unused
-    def 발행(@unused nft: NFT.type): Expr = Ptr(Id(name))
+    def 발행(@unused nft: NFT.type): Expr = Ref(Id(name))
   }
 
   case object NFT
-  
+
   implicit class PtrSetBuilder(ptr: Expr) {
     @unused def 게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(ptr)
-    
+
     @unused def 니게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(ptr)
-    
+
   }
-  
+
   implicit class PtrSetBuilderFromStr(name: String) {
     @unused def 게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(Id(name))
 
@@ -648,11 +658,11 @@ package mte {
   }
 
   case class PtrSetBuilder3(ptr: Expr, setExpr: Expr) {
-    @unused def 일(@unused x: 순없는지.type): Expr = SetPtr(ptr, setExpr)
+    @unused def 일(@unused x: 순없는지.type): Expr = SetRef(ptr, setExpr)
 
-    @unused def 힐(@unused x: 순없는지.type): Expr = SetPtr(ptr, setExpr)
+    @unused def 힐(@unused x: 순없는지.type): Expr = SetRef(ptr, setExpr)
   }
-  
+
   @unused case object 그런
   @unused case object 순없는지
 

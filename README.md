@@ -1,5 +1,7 @@
 # MTELang
 
+### MTELang, the Machine Titan-nose Expression Language
+
 Scala 3 내부에서 돌릴 수 있는 작은 프로그래밍 언어예요~ 
 
 ### 예제
@@ -76,6 +78,9 @@ def 팩토리얼(): Unit = {
 
 #### 코인터
 Golang의 코루틴이 고루틴인 것처럼 MTELang의 포인터를~ 코인터라고~ 부르기로 했어요
+
+문법은 `{expr} 발행 NFT` 라고 쓰면 코인터가 발급된단다.
+
 
 ```scala
 import mte._

@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="모든 변수가 수정 가능">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="포인터 추가 중">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
@@ -94,7 +94,7 @@
       <workItem from="1689468832407" duration="776000" />
       <workItem from="1689487533502" duration="8000" />
       <workItem from="1689487544982" duration="1000" />
-      <workItem from="1689491830639" duration="27914000" />
+      <workItem from="1689491830639" duration="34305000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -173,7 +173,14 @@
       <option name="project" value="LOCAL" />
       <updated>1689551112724</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="포인터 추가 중">
+      <created>1689585718883</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1689585718883</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -184,7 +191,8 @@
     <MESSAGE value="input 키워드 &quot;개입&quot; 추가" />
     <MESSAGE value="assertion 구문 추가" />
     <MESSAGE value="모든 변수가 수정 가능" />
-    <option name="LAST_COMMIT_MESSAGE" value="모든 변수가 수정 가능" />
+    <MESSAGE value="포인터 추가 중" />
+    <option name="LAST_COMMIT_MESSAGE" value="포인터 추가 중" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
