@@ -55,7 +55,9 @@ package mte {
     override def toString: String = s"BF<$name>($arg)"
   }
 
-  private case class BuiltinFnV2V(fn: Value => Value, arg: Expr) extends Expr
+  private case class BuiltinFnV2V(fn: Value => Value, arg: Expr, name: String) extends Expr {
+    override def toString: String = s"BFV<$name>($arg)"
+  }
 
 
   // Values
@@ -70,6 +72,8 @@ package mte {
   private case class CloV(argName: String, fExpr: Expr, var fEnv: Env) extends Value {
     override def toString: String = s"CloV($argName, $fExpr)"
   }
+
+  private case class Vec(data: Vector[Value]) extends Value
 
   private case class BoxV(addr: Addr) extends Value {
     /**
@@ -106,11 +110,11 @@ package mte {
       ret
     }
     
-    val valAdd = bigIntOpToValueOp(_ + _)
-    val valSub = bigIntOpToValueOp(_ - _)
-    val valMul = bigIntOpToValueOp(_ * _)
-    val valDiv = bigIntOpToValueOp(_ / _)
-    val valGt  = bigIntOpToValueOp(utility.gtInt)
+    val valAdd    = bigIntOpToValueOp(_ + _)
+    val valSub    = bigIntOpToValueOp(_ - _)
+    val valMul    = bigIntOpToValueOp(_ * _)
+    val valDiv    = bigIntOpToValueOp(_ / _)
+    val valGt     = bigIntOpToValueOp(utility.gtInt)
     val valLogNot = bigIntOpToValueOp(utility.logNot)
   }
 
@@ -166,7 +170,7 @@ package mte {
           if (valName.contains("킹") && valName.contains("갓")) {
             throw error.MteRuntimeErr("내가 킹하고 갓하고 함부로 막 붙이지 말라 그랬지!!")
           }
-          val initV: Value = pret(initExpr) |> unbox
+          val initV: Value = pret(initExpr)
           pEnv += (valName -> initV)
           initV
         case Fun(funName, argName, fExpr) =>
@@ -180,15 +184,15 @@ package mte {
           pret(cond) |> unbox match {
             case NumV(data) =>
               if (data != 0)
-                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprTrue), unitE)
+                fnCall(sugarbuilder.exprToFn(exprTrue), unitE)
               else
-                fnCall(Fun(utility.randomNameGen(), utility.randomNameGen(), exprFalse), unitE)
+                fnCall(sugarbuilder.exprToFn(exprFalse), unitE)
             case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
             )
           }
         case WhileN0(cond, exprIn) =>
-          val act = (condExpr: Expr) => {
+          val check = (condExpr: Expr) => {
             pret(condExpr) |> unbox match {
               case NumV(data) => data
               case err@_ => throw error.MteRuntimeErr(
@@ -196,10 +200,10 @@ package mte {
               )
             }
           }
-          var condVal = act(cond)
+          var condVal = check(cond)
           while (condVal != 0) {
-            pret(exprIn)
-            condVal = act(cond)
+            fnCall(sugarbuilder.exprToFn(exprIn), unitE)
+            condVal = check(cond)
           }
           unitV
         case NewBox(initExpr) =>
@@ -214,7 +218,7 @@ package mte {
               parentProcess.pSto += (addr -> setVal)
               setVal
             case err@_ => throw error.MteRuntimeErr(
-              s"얘! 지금 네 눈에 $err 이게 포인터로 보이니?"
+              s"얘! 지금 네 눈에 $err 이게 포인터로 보이니? env=$pEnv, sto=${parentProcess.pSto}"
             )
           }
         case Try(exprTry) =>
@@ -225,7 +229,7 @@ package mte {
             case _: error.MteRuntimeErr => NumV(0)
           }
         case BuiltinFnE2E(fn, arg, _) => pret(fn(arg))
-        case BuiltinFnV2V(fn, arg) => fn(pret(arg))
+        case BuiltinFnV2V(fn, arg, _) => fn(pret(arg))
       }
     }
   }
@@ -234,14 +238,30 @@ package mte {
   val unitV: UnitV = UnitV()
 
   package sugarbuilder {
-    def makeNewScope(expr: Expr): Expr =
-      App(Fun(utility.randomNameGen(), utility.randomNameGen(), expr), unitE)
+    def exprToFn(expr: Expr): Expr = Fun("", "_", expr)
+
+    def newScope(expr: Expr): Expr = App(exprToFn(expr), unitE)
 
     def makePrintExpr(expr: Expr, template: String = "%s"): Expr =
-      BuiltinFnV2V(v => builtin.write(v, template), expr)
+      BuiltinFnV2V(v => builtin.write(v, template), expr, "print")
 
-    def makeScopedWhile(condExpr: Expr, inExpr: Expr): Expr = makeNewScope(WhileN0(condExpr, inExpr))
+    def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
+      Seq(
+        ValDef(iterName, NewBox(initExpr)),
+        WhileN0(condExpr, Seq(
+          inExpr,
+          manipulationExpr
+        ))
+      )
+    }
 
+    def newSimpleFor(iterName: String, lbdInclusive: Expr, ubdExclusive: Expr, inExpr: Expr): Expr = newFor(
+      iterName = iterName,
+      initExpr = lbdInclusive,
+      condExpr = BinaryOp(ubdExclusive, Id(iterName), "Gt", ops.valGt),
+      manipulationExpr = SetBox(Id(iterName), Id(iterName) + 1),
+      inExpr = inExpr
+    )
 
   }
 
@@ -258,27 +278,14 @@ package mte {
   (all letters, $, _)
   */
 
-  /**
-   * 옛날 버전에서는 를! 함수를 사용해서 명시적으로 변수에 들어 있는 값을
-   * 꺼내와야 했다 맨이야! 이제는 그럴 필요가 없다맨
-   * @param name 변수명
-   * @return 그 아이디에 저장된 값
-   */
   implicit def toId(name: String): Expr = Id(name)
   implicit def toNum(num: Int): Expr = Num(num)
 
   implicit class NumExpansion(data: Num) {
-    @unused
-    def 뭉: Num = Num(2 * data.data + 1)
-
-    @unused
-    def 탱: Num = Num(2 * data.data)
-
-    @unused
-    def 뭉뭉: Num = Num(4 * data.data + 3)
-
-    @unused
-    def 뭉탱: Num = Num(4 * data.data + 2)
+    @unused def 뭉: Num = Num(2 * data.data + 1)
+    @unused def 탱: Num = Num(2 * data.data)
+    @unused def 뭉뭉: Num = Num(4 * data.data + 3)
+    @unused def 뭉탱: Num = Num(4 * data.data + 2)
 
     @unused
     def 탱뭉: Num = Num(4 * data.data + 1)
@@ -325,13 +332,16 @@ package mte {
     @unused def 리액션(template: String): Expr = sugarbuilder.makePrintExpr(lhs, template)
 
     @unused def 케바바바밥줘(rhs: Expr): Expr = Seq(lhs, rhs)
-    
+
     @unused def 꼽표(@unused rhs: EndState3): Expr = BinaryOp(lhs, Num(0), "LogNot", ops.valLogNot)
   }
-  
+
   @unused
   @targetName("bitNotBitNot")
   val ~~ = EndState3()
+
+  @unused
+  val 게이조이고 = EndState4()
 
   implicit class ExprOpsExtByExpr(lhs: Expr) extends ExprOps(lhs)
   implicit class ExprOpsExtByStr(lhs: String) extends ExprOps(Id(lhs))
@@ -341,7 +351,8 @@ package mte {
   class EndState1 extends EndState
   class EndState2 extends EndState
   class EndState3 extends EndState
-  
+  class EndState4 extends EndState
+
 
   @unused val 뭉: Num = Num(1)
   @unused val 탱: Num = Num(0)
@@ -375,11 +386,11 @@ package mte {
     }
   }
   case class Program(process: Process, mainFn: ProcessFn)
-  
+
   @unused
   @targetName("notFact")
   val ~! = EndState1()
-  
+
 
   @unused
   @targetName("quesQues")
@@ -450,7 +461,8 @@ package mte {
   case object 했대
 
   /**
-   * 함수를 정의한단다. 함수 리터럴이라 다른 함수에 인자로 넘겨줄 수도 있고 정의한 즉시 쓸 수도 있단다.
+   * 함수를 정의한단다. 함수 리터럴이라 다른 함수에 인자로 넘겨줄 수도 있고 정의한 즉시 쓸 수도 있어요~
+   * 람다 함수 만들 때 쓰는 가벼운 표현을 하나 더 만들 계획이다 맨이야
    * 문법: 아~! (("fnName", "argName") / ("argName"))은/는 (expr)이/가 참 좋구나~!
    */
   case object 아 {
@@ -462,7 +474,7 @@ package mte {
     @unused
     @targetName("notFact")
     def ~!(argName: String): FunBuilder =
-      FunBuilder(utility.randomNameGen(), argName)
+      FunBuilder("", argName)
 
     case class FunBuilder(funName: String, argName: String) {
       @unused
@@ -492,6 +504,24 @@ package mte {
   }
 
   case object 참
+
+  implicit class LambdaBuilder(argId: String) {
+    @unused
+    def 는(fnExpr: Expr): LambdaBuilder2 = LambdaBuilder2(argId, fnExpr)
+
+    @unused
+    def 은(fnExpr: Expr): LambdaBuilder2 = LambdaBuilder2(argId, fnExpr)
+
+    class LambdaBuilder2(argId: String, fnExpr: Expr) {
+      @unused
+      def 다(@unused joyGo: EndState4): Expr = Fun("", argId, fnExpr)
+
+      @unused
+      def 이다(@unused joyGo: EndState4): Expr = Fun("", argId, fnExpr)
+    }
+  }
+
+
 
   /**
    * 케인인님 함수호출 한판해요
@@ -536,38 +566,19 @@ package mte {
    * 문법: ((정수)수) (iterName) {expr}
    */
   @unused
-  implicit class BasicForBuilder(n: Int) {
+  class SimpleForBuilder(n: Expr) {
     @unused
     def 수(iterName: String)(forExpr: Expr): Expr =
-      sugarbuilder.makeNewScope(
-        Seq(ValDef(iterName, Num(0)), WhileN0(
-          Id(iterName) - Num(n),
-          Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
-        ))
-      )
+      sugarbuilder.newSimpleFor(iterName, 0, n, forExpr)
+
+    @unused
+    def 수(forExpr: Expr): Expr =
+      sugarbuilder.newSimpleFor("", 0, n, forExpr)
   }
 
-  implicit class ForBuilder(time: Expr) {
-    @unused
-    def 수(iterName: String)(forExpr: Expr): Expr =
-      sugarbuilder.makeNewScope(
-        Seq(ValDef(iterName, Num(0)), WhileN0(
-          Id(iterName) - time,
-          Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
-        ))
-      )
-  }
-
-  implicit class IdForBuilder(id: String) {
-    @unused
-    def 수(iterName: String)(forExpr: Expr): Expr =
-      sugarbuilder.makeNewScope(
-        Seq(ValDef(iterName, Num(0)), WhileN0(
-          Id(iterName) - Id(id),
-          Seq(forExpr, ValDef(iterName, Id(iterName) + Num(1)))
-        ))
-      )
-  }
+  implicit class SimpleForBuilderFromInt(n: Int) extends SimpleForBuilder(Num(n))
+  implicit class SimpleForBuilderFromExpr(expr: Expr) extends SimpleForBuilder(expr)
+  implicit class SimpleForBuilderFromId(id: String) extends SimpleForBuilder(Id(id))
 
   /**
    * 도네 금액이 케인인님의 마음에 들지 판단한단다.
@@ -603,7 +614,7 @@ package mte {
   case object 박스 {
     @unused
     def 아저씨(expr: Expr): Expr =
-      sugarbuilder.makeNewScope(expr)
+      sugarbuilder.newScope(expr)
   }
 
   /**
@@ -626,9 +637,9 @@ package mte {
   case object 정품 {
     @unused
     def 맞어(expr: Expr): Expr = {
-      IfN0(expr, UnitE(), BuiltinFnE2E(utility.makeKillFn(
+      IfN0(expr, unitE, BuiltinFnE2E(utility.makeKillFn(
         s"얘! $expr 이게 truthy 한 값이 되겠니??"
-      ), UnitE(), "kill"))
+      ), unitE, "kill"))
     }
   }
 
@@ -652,24 +663,20 @@ package mte {
 
   case object NFT
 
-  implicit class PtrSetBuilder(ptr: Expr) {
-    @unused def 게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(ptr)
-
-    @unused def 니게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(ptr)
-
+  class SetBoxBuilder(box: Expr) {
+    @unused def 게(@unused x: 그런.type): SetBoxBuilder2 = SetBoxBuilder2(box)
+    @unused def 니게(@unused x: 그런.type): SetBoxBuilder2 = SetBoxBuilder2(box)
   }
 
-  implicit class PtrSetBuilderFromStr(name: String) {
-    @unused def 게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(Id(name))
+  implicit class PtrSetBuilderFromExpr(box: Expr) extends SetBoxBuilder(box)
 
-    @unused def 니게(@unused x: 그런.type): PtrSetBuilder2 = PtrSetBuilder2(Id(name))
+  implicit class PtrSetBuilderFromStr(name: String) extends SetBoxBuilder(Id(name))
+
+  case class SetBoxBuilder2(ptr: Expr) {
+    @unused def 사람이(setExpr: Expr): SetBoxBuilder3 = SetBoxBuilder3(ptr, setExpr)
   }
 
-  case class PtrSetBuilder2(ptr: Expr) {
-    @unused def 사람이(setExpr: Expr): PtrSetBuilder3 = PtrSetBuilder3(ptr, setExpr)
-  }
-
-  case class PtrSetBuilder3(ptr: Expr, setExpr: Expr) {
+  case class SetBoxBuilder3(ptr: Expr, setExpr: Expr) {
     @unused def 일(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
 
     @unused def 힐(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
@@ -724,12 +731,21 @@ package mte {
      */
     private val rand: Random = new Random()
 
+    def randomStringGen(n: Int): String = {
+      var str: String = ""
+      for (i <- 0 to n) {
+        str += rand.nextPrintableChar()
+      }
+      str
+    }
+
+
     /**
      * 프로그램이 내부적으로 사용하는 변수 이름은 이 함수가 부여해 준단다.
      * @return 변수 이름
      */
     def randomNameGen(): String =
-      s"%reserved%_${rand.nextString(21)}%_%"
+      s"%rsvd%_${randomStringGen(21)}%_%"
 
     def randBetween(lbdInclusive: Int, ubdExclusive: Int): Int =
       rand.between(lbdInclusive, ubdExclusive)
