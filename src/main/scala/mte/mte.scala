@@ -263,6 +263,33 @@ package mte {
       inExpr = inExpr
     )
 
+    def newMultivariableFn(fnName: String, argName: Vector[String], fnExpr: Expr): Expr = {
+      def help(fnName: String, argName: Vector[String], fnExpr: Expr, depth: Int = 0): Expr =
+        if (argName.length <= 1)
+          Fun(fnName, argName(0), fnExpr)
+        else
+          Fun(fnName, argName.head, help(fnName + s"inner$depth", argName.tail, fnExpr, depth + 1))
+
+      help(fnName, argName, fnExpr)
+    }
+
+    def newMultivariableLambda(argName: Vector[String], fnExpr: Expr): Expr = {
+      if (argName.length <= 1)
+        Fun("", argName(0), fnExpr)
+      else
+        Fun("", argName.head, newMultivariableLambda(argName.tail, fnExpr))
+    }
+
+    @tailrec
+    def newMultivariableApp(fnExpr: Expr, args: Vector[Expr]): Expr = {
+      if (args.length < 1) {
+        throw Exception("args not given")
+      } else if (args.length == 1) {
+        App(fnExpr, args(0))
+      } else {
+        newMultivariableApp(App(fnExpr, args(0)), args.tail)
+      }
+    }
   }
 
   /*
@@ -428,7 +455,7 @@ package mte {
   @unused val 아니: ValBuilderInit = ValBuilderInit()
   /**
    * 얘! 변수 사용이 잘 안 되니? 이걸로 변수를 정의해 보렴!
-   * 문법: 아니 자기가 (id)라는 사람인데 {expr}을 했대
+   * 문법: 아니세상에 자기가 (id)라는 사람인데 {expr}을 했대
    */
   @unused val 아니세상에: ValBuilderInit = ValBuilderInit()
 
@@ -505,50 +532,52 @@ package mte {
 
   case object 참
 
-  implicit class LambdaBuilder(argId: String) {
+  class MultlLambdaBuilder(argIds: Vector[String]) {
     @unused
-    def 는(fnExpr: Expr): LambdaBuilder2 = LambdaBuilder2(argId, fnExpr)
+    def 은(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
 
     @unused
-    def 은(fnExpr: Expr): LambdaBuilder2 = LambdaBuilder2(argId, fnExpr)
+    def 는(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
 
-    class LambdaBuilder2(argId: String, fnExpr: Expr) {
+    class MultiLambdaBuilder2(argIds: Vector[String], fnExpr: Expr) {
       @unused
-      def 다(@unused joyGo: EndState4): Expr = Fun("", argId, fnExpr)
+      def 다(@unused joyGo: EndState4): Expr = sugarbuilder.newMultivariableLambda(argIds, fnExpr)
 
       @unused
-      def 이다(@unused joyGo: EndState4): Expr = Fun("", argId, fnExpr)
+      def 이다(@unused joyGo: EndState4): Expr = sugarbuilder.newMultivariableLambda(argIds, fnExpr)
     }
   }
 
-
+  implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[String]) extends MultlLambdaBuilder(argIds)
+  implicit class MultiLambdaBuilderFromStr(argName: String) extends MultlLambdaBuilder(Vector(argName))
 
   /**
    * 케인인님 함수호출 한판해요
    * 문법: (f)아/야 (arg) 먹어라??
    * @param f 호출할 함수
    */
-  implicit class AppBuilder1(f: Expr) {
-    def 아(arg: Expr): AppBuilder2 =
-      AppBuilder2(f, arg)
+  case class AppBuilder(f: Expr) {
+    @unused
+    def 아(arg: Expr): AppBuilder2 = AppBuilder2(f, Vector(arg))
 
     @unused
-    def 야(arg: Expr): AppBuilder2 =
-      AppBuilder2(f, arg)
+    def 아(args: Vector[Expr]): AppBuilder2 = AppBuilder2(f, args)
+
+    @unused
+    def 야(arg: Expr): AppBuilder2 = AppBuilder2(f, Vector(arg))
+
+    @unused
+    def 야(args: Vector[Expr]): AppBuilder2 = AppBuilder2(f, args)
+
+    case class AppBuilder2(f: Expr, args: Vector[Expr]) {
+      def 먹어라(@unused x: EndState2): Expr =
+        sugarbuilder.newMultivariableApp(f, args)
+    }
   }
 
-  implicit class AppBuilder0(name: String) {
-    def 아(arg: Expr): AppBuilder2 =
-      AppBuilder2(Id(name), arg)
-
-    def 야(arg: Expr): AppBuilder2 =
-      AppBuilder2(Id(name), arg)
-  }
-
-  case class AppBuilder2(f: Expr, arg: Expr) {
-    def 먹어라(@unused x: EndState2): Expr =
-      App(f, arg)
-  }
+  implicit class AppBuilderFromExpr(f: Expr) extends AppBuilder(f)
+  implicit class AppBuilderFromId(id: String) extends AppBuilder(Id(id))
+  implicit class AppBuilderFromInt(n: Int) extends AppBuilder(Num(n))
 
   /**
    * 케인님이 조건문이 거짓이 되기 전까지 강제연결을 해 주신단다!
@@ -585,26 +614,21 @@ package mte {
    * 문법: (lhs) 돈 (rhs) 원에??
    * @param lhs lhs
    */
-  @unused
-  implicit class GtBuilder(lhs: Expr) {
+  class GtBuilder(lhs: Expr) {
     @unused
     def 돈(rhs: Expr): GtBuilder2 =
       GtBuilder2(lhs, rhs)
+
+    case class GtBuilder2(lhs: Expr, rhs: Expr) {
+      @unused
+      def 원에(@unused x: EndState2): Expr =
+        BinaryOp(lhs, rhs, "Gt", ops.valGt)
+    }
   }
 
-  @unused
-  case class GtBuilder2(lhs: Expr, rhs: Expr) {
-    @unused
-    def 원에(@unused x: EndState2): Expr =
-      BinaryOp(lhs, rhs, "Gt", ops.valGt)
-  }
-
-  @unused
-  implicit class GtBuilder0(lhs: String) {
-    @unused
-    def 돈(rhs: Expr): GtBuilder2 =
-      GtBuilder2(Id(lhs), rhs)
-  }
+  implicit class GtBuilderFromExpr(lhs: Expr) extends GtBuilder(lhs)
+  implicit class GtBuilderFromString(lhs: String) extends GtBuilder(Id(lhs))
+  implicit class GtBuilderFromInt(lhs: Int) extends GtBuilder(Num(lhs))
 
   /**
    * 새 스코프를 생성한단다.
@@ -644,46 +668,58 @@ package mte {
   }
 
   @unused
-  implicit class BoxBuilder(expr: Expr) {
+  class BoxBuilder(expr: Expr) {
     @unused
     def 발행(@unused nft: NFT.type): Expr = NewBox(expr)
   }
 
-  @unused
-  implicit class BoxBuilderFromID(name: String) {
-    @unused
-    def 발행(@unused nft: NFT.type): Expr = NewBox(Id(name))
-  }
-
-  @unused
-  implicit class BoxBuilderFromNumber(num: Int) {
-    @unused
-    def 발행(@unused nft: NFT.type): Expr = NewBox(Num(num))
-  }
+  implicit class BoxBuilderFromExpr(expr: Expr) extends BoxBuilder(expr)
+  implicit class BoxBuilderFromID(name: String) extends BoxBuilder(Id(name))
+  implicit class BoxBuilderFromNumber(num: Int) extends BoxBuilder(Num(num))
 
   case object NFT
 
   class SetBoxBuilder(box: Expr) {
     @unused def 게(@unused x: 그런.type): SetBoxBuilder2 = SetBoxBuilder2(box)
     @unused def 니게(@unused x: 그런.type): SetBoxBuilder2 = SetBoxBuilder2(box)
+
+    case class SetBoxBuilder2(ptr: Expr) {
+      @unused def 사람이(setExpr: Expr): SetBoxBuilder3 = SetBoxBuilder3(ptr, setExpr)
+    }
+
+    case class SetBoxBuilder3(ptr: Expr, setExpr: Expr) {
+      @unused def 일(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
+
+      @unused def 힐(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
+    }
   }
 
   implicit class PtrSetBuilderFromExpr(box: Expr) extends SetBoxBuilder(box)
-
   implicit class PtrSetBuilderFromStr(name: String) extends SetBoxBuilder(Id(name))
-
-  case class SetBoxBuilder2(ptr: Expr) {
-    @unused def 사람이(setExpr: Expr): SetBoxBuilder3 = SetBoxBuilder3(ptr, setExpr)
-  }
-
-  case class SetBoxBuilder3(ptr: Expr, setExpr: Expr) {
-    @unused def 일(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
-
-    @unused def 힐(@unused x: 순없는지.type): Expr = SetBox(ptr, setExpr)
-  }
+  implicit class PtrSetBuilderFromInt(num: Int) extends SetBoxBuilder(Num(num))
 
   @unused case object 그런
   @unused case object 순없는지
+
+  class ArgListBuilder(argList: Vector[String]) {
+    @unused
+    @targetName("plusPlusPlus")
+    def +++(nextArgId: String): Vector[String] = argList.appended(nextArgId)
+  }
+
+  implicit class ArgListBuilderFromVecStr(argList: Vector[String]) extends ArgListBuilder(argList)
+  implicit class ArgListBuilderFromStr(firstArg: String) extends ArgListBuilder(Vector(firstArg))
+
+  @unused
+  object 묶음 {
+    @unused
+    @targetName("factFact")
+    def !!(args: Expr*): Vector[Expr] = {
+      var ret: Vector[Expr] = Vector()
+      for (arg <- args) ret = ret.appended(arg)
+      ret
+    }
+  }
 
   /**
    * 랜덤이 필요하면 윷놀이 를! 아침까지 조이도록 해요~

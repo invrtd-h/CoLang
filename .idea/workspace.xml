@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="Box oriented로 돌아감">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="for문 scope 처리 적용">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
@@ -93,7 +93,7 @@
       <workItem from="1689468832407" duration="776000" />
       <workItem from="1689487533502" duration="8000" />
       <workItem from="1689487544982" duration="1000" />
-      <workItem from="1689491830639" duration="51074000" />
+      <workItem from="1689491830639" duration="60803000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -193,7 +193,14 @@
       <option name="project" value="LOCAL" />
       <updated>1689700142615</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="for문 scope 처리 적용">
+      <created>1689751293213</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1689751293213</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -218,7 +225,8 @@
     <MESSAGE value="포인터 추가 중" />
     <MESSAGE value="If문 블럭 처리 완료, 다시 Box oriented expression으로 돌아가야 할 것 같음" />
     <MESSAGE value="Box oriented로 돌아감" />
-    <option name="LAST_COMMIT_MESSAGE" value="Box oriented로 돌아감" />
+    <MESSAGE value="for문 scope 처리 적용" />
+    <option name="LAST_COMMIT_MESSAGE" value="for문 scope 처리 적용" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
