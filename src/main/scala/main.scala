@@ -4,7 +4,7 @@ import scala.annotation.unused
 
 @main
 def main(): Unit = {
-  구구단()
+  구구단2()
   팩토리얼()
 
   val vd: TestValidator = TestValidator()
@@ -91,6 +91,16 @@ def 구구단(): Unit = {
   춘잣! {
     (11수) ("i") {
       (11수) ("j") {
+        "i" 조이고 "j" 리액션 "%s\t"
+      } 리액션 "\n"
+    }
+  }
+}
+
+def 구구단2(): Unit = {
+  춘잣! {
+    (1 달려가 10) ("i") {
+      (1 달려가 10) ("j") {
         "i" 조이고 "j" 리액션 "%s\t"
       } 리액션 "\n"
     }

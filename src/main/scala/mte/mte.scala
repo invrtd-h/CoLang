@@ -608,6 +608,14 @@ package mte {
   implicit class SimpleForBuilderFromInt(n: Int) extends SimpleForBuilder(Num(n))
   implicit class SimpleForBuilderFromExpr(expr: Expr) extends SimpleForBuilder(expr)
   implicit class SimpleForBuilderFromId(id: String) extends SimpleForBuilder(Id(id))
+  
+  class RunningForBuilder(lhs: Expr) {
+    @unused
+    def 달려가(rhs: Expr)(iterName: String)(forExpr: Expr): Expr =
+      sugarbuilder.newSimpleFor(iterName, lhs, rhs, forExpr)
+  }
+  
+  implicit class RunningForBuilderFromInt(n: Int) extends RunningForBuilder(Num(n))
 
   /**
    * 도네 금액이 케인인님의 마음에 들지 판단한단다.
