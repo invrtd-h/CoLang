@@ -49,6 +49,8 @@ package mte {
 
   private case class SetBox(box: Expr, setExpr: Expr) extends Expr
 
+  private case class Vec(data: Vector[Expr]) extends Expr
+
   private case class Try(exprTry: Expr) extends Expr
 
   private case class BuiltinFnE2E(fn: Expr => Expr, arg: Expr, name: String) extends Expr {
@@ -61,7 +63,7 @@ package mte {
 
 
   // Values
-  private case class UnitV() extends Value {
+  case class UnitV() extends Value {
     override def toString: String = "UnitV"
   }
 
@@ -73,7 +75,7 @@ package mte {
     override def toString: String = s"CloV($argName, $fExpr)"
   }
 
-  private case class Vec(data: Vector[Value]) extends Value
+  private case class VecV(data: Vector[Value]) extends Value
 
   private case class BoxV(addr: Addr) extends Value {
     /**
@@ -89,33 +91,6 @@ package mte {
       }
       f"*[0x$newAddr%16x]"
     }
-  }
-
-  package ops {
-    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Value = {
-      def ret(lhs: => Value, rhs: => Value): Value = {
-        lhs match {
-          case NumV(dataL) => rhs match {
-            case NumV(dataR) => NumV(op(dataL, dataR))
-            case _ => throw error.MteRuntimeErr(
-              s"얘! 여기 지금 $rhs 이게 숫자로 보이니??"
-            )
-          }
-          case _ => throw error.MteRuntimeErr(
-            s"얘! 여기 지금 $lhs 이게 숫자로 보이니??"
-          )
-        }
-      }
-
-      ret
-    }
-    
-    val valAdd    = bigIntOpToValueOp(_ + _)
-    val valSub    = bigIntOpToValueOp(_ - _)
-    val valMul    = bigIntOpToValueOp(_ * _)
-    val valDiv    = bigIntOpToValueOp(_ / _)
-    val valGt     = bigIntOpToValueOp(utility.gtInt)
-    val valLogNot = bigIntOpToValueOp(utility.logNot)
   }
 
   @unused
@@ -161,7 +136,10 @@ package mte {
         case UnitE() => unitV
         case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> unbox, pret(rhs) |> unbox)
         case Id(name) => pEnv.get(name) match {
-          case Some(value) => value
+          case Some(value) => value match {
+            case NumV(num) => NumV(num - 3000 * name.count(_ == '코'))
+            case _ => value
+          }
           case _ => throw error.MteRuntimeErr(
             s"얘! 컴파일쟁이($pEnv)들은 $name 이런 거 잘 몰라 임마!"
           )
@@ -221,6 +199,7 @@ package mte {
               s"얘! 지금 네 눈에 $err 이게 포인터로 보이니? env=$pEnv, sto=${parentProcess.pSto}"
             )
           }
+        case Vec(data) => VecV(data.map(pret))
         case Try(exprTry) =>
           try {
             pret(exprTry)
@@ -236,6 +215,93 @@ package mte {
 
   val unitE: UnitE = UnitE()
   val unitV: UnitV = UnitV()
+
+  package ops {
+
+    import java.lang.Package
+
+    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Value = {
+      def ret(lhs: => Value, rhs: => Value): Value = {
+        lhs match {
+          case NumV(dataL) => rhs match {
+            case NumV(dataR) => NumV(op(dataL, dataR))
+            case _ => throw error.MteRuntimeErr(
+              s"얘! 여기 지금 $rhs 이게 숫자로 보이니??"
+            )
+          }
+          case _ => throw error.MteRuntimeErr(
+            s"얘! 여기 지금 $lhs 이게 숫자로 보이니??"
+          )
+        }
+      }
+
+      ret
+    }
+
+    def unaryToBinary(op: (=> Value) => Value): (=> Value, => Value) => Value = {
+      def ret(lhs: => Value, @unused rhs: => Value): Value = op(lhs)
+      ret
+    }
+
+    val valAdd = bigIntOpToValueOp(_ + _)
+    val valSub = bigIntOpToValueOp(_ - _)
+    val valMul = bigIntOpToValueOp(_ * _)
+    val valDiv = bigIntOpToValueOp(_ / _)
+    val valGt = bigIntOpToValueOp(utility.gtInt)
+    val valLogNot = bigIntOpToValueOp(utility.logNot)
+
+    def vecAccess(vec: => Value, idx: => Value): Value = vec match {
+      case VecV(data) => idx match {
+        case NumV(n) =>
+          if (n < 0 || n >= data.length)
+            throw error.MteRuntimeErr(
+              s"얘! 지금 idx=$n 이게 길이 ${data.length}짜리 뭉탱이에 접근이 되겠니??"
+            )
+          else
+            data(n.toInt)
+        case _ => throw error.MteRuntimeErr(
+          s"얘! 지금 뭉탱이 인덱스가 $idx 이게 숫자로 보이니??"
+        )
+      }
+      case _ => throw error.MteRuntimeErr(
+        s"얘! 지금 뭉탱이 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 뭉탱이로 보이냐??"
+      )
+    }
+
+    def makeVecAccessExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAccess", vecAccess)
+
+    def vecAppend(lhs: => Value, rhs: => Value): Value = lhs match {
+      case VecV(lData) => VecV(lData :+ rhs)
+      case _ => throw error.MteRuntimeErr(
+        s"얘! 지금 뭉탱이 원소 추가 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 여기다 뭘 넣겠다는 거니??"
+      )
+    }
+
+    def makeVecAppendExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAppend", vecAppend)
+
+    def vecExtension(lhs: => Value, rhs: => Value): Value = lhs match {
+      case VecV(lData) => rhs match {
+        case VecV(rData) => VecV(lData ++ rData)
+        case _ => throw error.MteRuntimeErr(
+          s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 뭉탱이로 보이냐??"
+        )
+      }
+      case _ => throw error.MteRuntimeErr(
+        s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 뭉탱이로 보이냐??"
+      )
+    }
+
+    def makeVecExtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecExt", vecExtension)
+
+    def vecSizeUnary(vec: => Value): Value = vec match {
+      case VecV(data) => NumV(data.length)
+      case _ => throw error.MteRuntimeErr(
+        s"얘! 지금 $vec 이게 뭉탱이로 보이냐??"
+      )
+    }
+
+    val vecSize = unaryToBinary(vecSizeUnary)
+  }
 
   package sugarbuilder {
     def exprToFn(expr: Expr): Expr = Fun("", "_", expr)
@@ -283,7 +349,9 @@ package mte {
     @tailrec
     def newMultivariableApp(fnExpr: Expr, args: Vector[Expr]): Expr = {
       if (args.length < 1) {
-        throw Exception("args not given")
+        throw error.MteSyntaxErr(
+          "얘! 인자 리스트에 아무것도 없단다!"
+        )
       } else if (args.length == 1) {
         App(fnExpr, args(0))
       } else {
@@ -313,36 +381,16 @@ package mte {
     @unused def 탱: Num = Num(2 * data.data)
     @unused def 뭉뭉: Num = Num(4 * data.data + 3)
     @unused def 뭉탱: Num = Num(4 * data.data + 2)
-
-    @unused
-    def 탱뭉: Num = Num(4 * data.data + 1)
-
-    @unused
-    def 탱탱: Num = Num(4 * data.data)
-
-    @unused
-    def 뭉뭉뭉: Num = Num(8 * data.data + 7)
-
-    @unused
-    def 뭉뭉탱: Num = Num(8 * data.data + 6)
-
-    @unused
-    def 뭉탱뭉: Num = Num(8 * data.data + 5)
-
-    @unused
-    def 뭉탱탱: Num = Num(8 * data.data + 4)
-
-    @unused
-    def 탱뭉뭉: Num = Num(8 * data.data + 3)
-
-    @unused
-    def 탱뭉탱: Num = Num(8 * data.data + 2)
-
-    @unused
-    def 탱탱뭉: Num = Num(8 * data.data + 1)
-
-    @unused
-    def 탱탱탱: Num = Num(8 * data.data)
+    @unused def 탱뭉: Num = Num(4 * data.data + 1)
+    @unused def 탱탱: Num = Num(4 * data.data)
+    @unused def 뭉뭉뭉: Num = Num(8 * data.data + 7)
+    @unused def 뭉뭉탱: Num = Num(8 * data.data + 6)
+    @unused def 뭉탱뭉: Num = Num(8 * data.data + 5)
+    @unused def 뭉탱탱: Num = Num(8 * data.data + 4)
+    @unused def 탱뭉뭉: Num = Num(8 * data.data + 3)
+    @unused def 탱뭉탱: Num = Num(8 * data.data + 2)
+    @unused def 탱탱뭉: Num = Num(8 * data.data + 1)
+    @unused def 탱탱탱: Num = Num(8 * data.data)
   }
 
   class ExprOps(lhs: Expr) {
@@ -375,10 +423,10 @@ package mte {
   implicit class ExprOpsExtByNum(lhs: Int) extends ExprOps(Num(lhs))
 
   class EndState
-  class EndState1 extends EndState
-  class EndState2 extends EndState
-  class EndState3 extends EndState
-  class EndState4 extends EndState
+  case class EndState1() extends EndState
+  case class EndState2() extends EndState
+  case class EndState3() extends EndState
+  case class EndState4() extends EndState
 
 
   @unused val 뭉: Num = Num(1)
@@ -532,7 +580,7 @@ package mte {
 
   case object 참
 
-  class MultlLambdaBuilder(argIds: Vector[String]) {
+  class MultiLambdaBuilder(argIds: Vector[String]) {
     @unused
     def 은(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
 
@@ -548,8 +596,8 @@ package mte {
     }
   }
 
-  implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[String]) extends MultlLambdaBuilder(argIds)
-  implicit class MultiLambdaBuilderFromStr(argName: String) extends MultlLambdaBuilder(Vector(argName))
+  implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[String]) extends MultiLambdaBuilder(argIds)
+  implicit class MultiLambdaBuilderFromStr(argName: String) extends MultiLambdaBuilder(Vector(argName))
 
   /**
    * 케인인님 함수호출 한판해요
@@ -595,7 +643,7 @@ package mte {
    * 문법: ((정수)수) (iterName) {expr}
    */
   @unused
-  class SimpleForBuilder(n: Expr) {
+  case class SimpleForBuilder(n: Expr) {
     @unused
     def 수(iterName: String)(forExpr: Expr): Expr =
       sugarbuilder.newSimpleFor(iterName, 0, n, forExpr)
@@ -608,13 +656,13 @@ package mte {
   implicit class SimpleForBuilderFromInt(n: Int) extends SimpleForBuilder(Num(n))
   implicit class SimpleForBuilderFromExpr(expr: Expr) extends SimpleForBuilder(expr)
   implicit class SimpleForBuilderFromId(id: String) extends SimpleForBuilder(Id(id))
-  
-  class RunningForBuilder(lhs: Expr) {
+
+  case class RunningForBuilder(lhs: Expr) {
     @unused
     def 달려가(rhs: Expr)(iterName: String)(forExpr: Expr): Expr =
       sugarbuilder.newSimpleFor(iterName, lhs, rhs, forExpr)
   }
-  
+
   implicit class RunningForBuilderFromInt(n: Int) extends RunningForBuilder(Num(n))
 
   /**
@@ -622,7 +670,7 @@ package mte {
    * 문법: (lhs) 돈 (rhs) 원에??
    * @param lhs lhs
    */
-  class GtBuilder(lhs: Expr) {
+  case class GtBuilder(lhs: Expr) {
     @unused
     def 돈(rhs: Expr): GtBuilder2 =
       GtBuilder2(lhs, rhs)
@@ -676,7 +724,7 @@ package mte {
   }
 
   @unused
-  class BoxBuilder(expr: Expr) {
+  case class BoxBuilder(expr: Expr) {
     @unused
     def 발행(@unused nft: NFT.type): Expr = NewBox(expr)
   }
@@ -687,7 +735,7 @@ package mte {
 
   case object NFT
 
-  class SetBoxBuilder(box: Expr) {
+  case class SetBoxBuilder(box: Expr) {
     @unused def 게(@unused x: 그런.type): SetBoxBuilder2 = SetBoxBuilder2(box)
     @unused def 니게(@unused x: 그런.type): SetBoxBuilder2 = SetBoxBuilder2(box)
 
@@ -709,25 +757,86 @@ package mte {
   @unused case object 그런
   @unused case object 순없는지
 
-  class ArgListBuilder(argList: Vector[String]) {
+  case class ArgListBuilder(argList: Vector[String]) {
     @unused
     @targetName("plusPlusPlus")
-    def +++(nextArgId: String): Vector[String] = argList.appended(nextArgId)
+    def +++(nextArgId: String): Vector[String] = argList :+ nextArgId
   }
 
   implicit class ArgListBuilderFromVecStr(argList: Vector[String]) extends ArgListBuilder(argList)
   implicit class ArgListBuilderFromStr(firstArg: String) extends ArgListBuilder(Vector(firstArg))
 
+  /**
+   * 다변수 함수에 인자를 전달할 때 쓰는 문법을 만들었어요~
+   * 문법: fnExpr 묶음!!(arg1, arg2, ...)
+   */
   @unused
   object 묶음 {
     @unused
     @targetName("factFact")
     def !!(args: Expr*): Vector[Expr] = {
       var ret: Vector[Expr] = Vector()
-      for (arg <- args) ret = ret.appended(arg)
+      for (arg <- args) ret = ret :+ arg
       ret
     }
   }
+
+  /**
+   * 자~ 나쁜놈이 이렇게 뭉탱이를 만든다고 했는데, 이건 벡터를 만드는 문법이지~ 뭉탱이를 만드는 문법이 아니에요~~ 꼽표~~
+   * @param args 벡터를 구성하는 원소들 (variadic)
+   * @return 벡터에 해당하는 표현식
+   * @return 벡터에 해당하는 표현식
+   */
+  @unused
+  def 뭉탱이(args: Expr*): Expr = {
+    var ret: Vector[Expr] = Vector()
+    for (arg <- args) ret = ret :+ arg
+    Vec(ret)
+  }
+
+  /**
+   * 문법: expr 갖고와 임마!! idx
+   * @param lhs expr
+   */
+  case class VecAccessBuilder(lhs: Expr) {
+    import 임마.VecAccessRhsBuilder
+    @unused
+    def 갖고와(accIdxWrapper: VecAccessRhsBuilder): Expr = ops.makeVecAccessExpr(lhs, accIdxWrapper.accIdx)
+  }
+
+  case object 임마 {
+    @unused
+    @targetName("factFact")
+    def !!(accIdx: Expr): VecAccessRhsBuilder = VecAccessRhsBuilder(accIdx)
+
+    case class VecAccessRhsBuilder(accIdx: Expr)
+  }
+
+  implicit class VecAccessBuilderFromExpr(lhs: Expr) extends VecAccessBuilder(lhs)
+  implicit class VecAccessBuilderFromId(id: String) extends VecAccessBuilder(Id(id))
+  implicit class VecAccessBuilderFromInt(num: Int) extends VecAccessBuilder(Num(num))
+
+  case class VecAppendBuilder(vec: Expr) {
+    @unused
+    def undeterminednameop(rhs: Expr): Expr = ops.makeVecAppendExpr(vec, rhs)
+  }
+
+  implicit class VecAppendBuilderFromExpr(vec: Expr) extends VecAppendBuilder(vec)
+  implicit class VecAppendBuilderFromId(id: String) extends VecAppendBuilder(Id(id))
+  implicit class VecAppendBuilderFromInt(num: Int) extends VecAppendBuilder(Num(num))
+
+  /**
+   * 문법: lhs 조이는 rhs
+   * @param lhs lhs
+   */
+  case class VecExtBuilder(lhs: Expr) {
+    @unused
+    def 조이는(rhs: Expr): Expr = ops.makeVecExtExpr(lhs, rhs)
+  }
+
+  implicit class VecExtBuilderFromExpr(lhs: Expr) extends VecExtBuilder(lhs)
+  implicit class VecExtBuilderFromId(id: String) extends VecExtBuilder(Id(id))
+  implicit class VecExtBuilderFromInt(num: Int) extends VecExtBuilder(Num(num))
 
   /**
    * 랜덤이 필요하면 윷놀이 를! 아침까지 조이도록 해요~
@@ -777,7 +886,7 @@ package mte {
 
     def randomStringGen(n: Int): String = {
       var str: String = ""
-      for (i <- 0 to n) {
+      for (_ <- 0 to n) {
         str += rand.nextPrintableChar()
       }
       str
@@ -811,9 +920,10 @@ package mte {
       if (lhs == 0) 1 else 0
 
     def makeKillFn(msg: String): Expr => Expr = {
-      def ret(unitE: Expr): Expr =
+      def ret(unitE: Expr): Expr = {
         assert(false, msg)
         unitE
+      }
 
       ret
     }
@@ -838,6 +948,10 @@ package mte {
      * @param cause cause
      */
     final case class MteRuntimeErr(private val message: String = "",
+                                   private val cause: Throwable = None.orNull)
+      extends Exception(message, cause)
+
+    final case class MteSyntaxErr(private val message: String = "",
                                    private val cause: Throwable = None.orNull)
       extends Exception(message, cause)
   }

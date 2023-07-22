@@ -11,6 +11,7 @@ def main(): Unit = {
   vd.validate(test1)
   vd.validate(test2)
   vd.validate(test3)
+  vd.validate(test4)
 }
 
 def 포인터실험(): Unit = {
@@ -56,7 +57,7 @@ def test3(): Unit = {
     } 를 했대
   } 케바바바밥줘 {
     정품 맞어 {
-      "함수"야 묶음!!(1, 2, 3) 먹어라?? 리액션 "%s\n" 꼽표~~
+      "함수"야 묶음!!(1, 2, 3) 먹어라?? 꼽표~~
     }
   }
 }
@@ -117,9 +118,18 @@ def test1(): Unit = {
   }
 }
 
+def test4(): Unit = {
+  춘잣! {
+    뭉탱이(0, 1, 2, 3, 4) 갖고와 임마!! 3 배 7 리액션 "%s\n"
+  } 케바바바밥줘 {
+    뭉탱이(0, 1, 2, 3) 조이는 뭉탱이(4, 5, 6, 7) 리액션 "%s\n"
+  }
+}
+
 class TestValidator(var n: Int = 1) {
-  def validate(f: () => Unit): Unit =
+  def validate(f: () => Unit): Unit = {
     f()
     println("test %d validated".format(n))
     n += 1
+  }
 }
