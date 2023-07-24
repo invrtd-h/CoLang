@@ -1,6 +1,6 @@
 # MTELang
 
-### MTELang, the Machine to Titan-nose Expression Language
+### MTELang, the Machine Treatable Eunpyeonggu-harabangtaenge Language
 
 Scala 3 내부에서 돌릴 수 있는 작은 프로그래밍 언어예요~ 
 
@@ -12,10 +12,10 @@ Scala 3 내부에서 돌릴 수 있는 작은 프로그래밍 언어예요~
 import mte._
 import scala.language.postfixOps
 
-def 구구단(): Unit = {
+def 구구단2(): Unit = {
   춘잣! {
-    (11수) ("i") {
-      (11수) ("j") {
+    (1 달려가 10) ("i") {
+      (1 달려가 10) ("j") {
         "i" 조이고 "j" 리액션 "%s\t"
       } 리액션 "\n"
     }

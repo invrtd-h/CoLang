@@ -9,9 +9,6 @@ package mte {
   sealed trait Expr {
     @targetName("plus")
     def +(rhs: Expr): Expr = BinaryOp(this, rhs, "plus", ops.valAdd)
-
-    @targetName("minus")
-    def -(rhs: Expr): Expr = BinaryOp(this, rhs, "minus", ops.valSub)
   }
 
   sealed trait Value
@@ -441,11 +438,13 @@ package mte {
   @unused val 스키비야: UnitE = unitE
   @unused val 스킵이야: UnitE = unitE
 
-  def 춘잣: ProgramBuilder = {
+  def makeNewProgram: Program = {
     val process: Process = Process(Map())
     val program: Program = Program(process, ProcessFn(process, Map()))
-    ProgramBuilder(program)
+    program
   }
+
+  def 춘잣: ProgramBuilder = ProgramBuilder(makeNewProgram)
 
   case class ProgramBuilder(program: Program) {
     @targetName("fact")
@@ -816,27 +815,27 @@ package mte {
   implicit class VecAccessBuilderFromId(id: String) extends VecAccessBuilder(Id(id))
   implicit class VecAccessBuilderFromInt(num: Int) extends VecAccessBuilder(Num(num))
 
-  case class VecAppendBuilder(vec: Expr) {
-    @unused
-    def undeterminednameop(rhs: Expr): Expr = ops.makeVecAppendExpr(vec, rhs)
-  }
-
-  implicit class VecAppendBuilderFromExpr(vec: Expr) extends VecAppendBuilder(vec)
-  implicit class VecAppendBuilderFromId(id: String) extends VecAppendBuilder(Id(id))
-  implicit class VecAppendBuilderFromInt(num: Int) extends VecAppendBuilder(Num(num))
-
-  /**
-   * 문법: lhs 조이는 rhs
-   * @param lhs lhs
-   */
-  case class VecExtBuilder(lhs: Expr) {
+  case class VecOpsBuilder(lhs: Expr) {
+    /**
+     * 문법: lhs 조이는 rhs
+     * @param rhs 연결할 벡터
+     * @return 연결된 벡터를 나타내는 표현식
+     */
     @unused
     def 조이는(rhs: Expr): Expr = ops.makeVecExtExpr(lhs, rhs)
+
+    /**
+     * 문법: vec 즐기면서가자 fn
+     * @param fn vec의 각 원소에 적용할 함수
+     * @return vector map을 나타내는 표현식
+     */
+    @unused
+    def 즐기면서가자(fn: Expr): Expr = ???
   }
 
-  implicit class VecExtBuilderFromExpr(lhs: Expr) extends VecExtBuilder(lhs)
-  implicit class VecExtBuilderFromId(id: String) extends VecExtBuilder(Id(id))
-  implicit class VecExtBuilderFromInt(num: Int) extends VecExtBuilder(Num(num))
+  implicit class VecOpsBuilderFromExpr(lhs: Expr) extends VecOpsBuilder(lhs)
+  implicit class VecOpsBuilderFromId(id: String) extends VecOpsBuilder(Id(id))
+  implicit class VecOpsBuilderFromInt(num: Int) extends VecOpsBuilder(Num(num))
 
   /**
    * 랜덤이 필요하면 윷놀이 를! 아침까지 조이도록 해요~
@@ -915,7 +914,7 @@ package mte {
      */
     def gtInt(lhs: BigInt, rhs: BigInt): BigInt =
       if (lhs > rhs) 1 else 0
-      
+
     def logNot(lhs: BigInt, @unused rhs: BigInt): BigInt =
       if (lhs == 0) 1 else 0
 
@@ -952,7 +951,7 @@ package mte {
       extends Exception(message, cause)
 
     final case class MteSyntaxErr(private val message: String = "",
-                                   private val cause: Throwable = None.orNull)
+                                  private val cause: Throwable = None.orNull)
       extends Exception(message, cause)
   }
 }

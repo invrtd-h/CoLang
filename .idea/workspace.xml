@@ -4,9 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="키워드 '달려가' 추가">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="vector addition 추가">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -94,7 +94,10 @@
       <workItem from="1689487533502" duration="8000" />
       <workItem from="1689487544982" duration="1000" />
       <workItem from="1689491830639" duration="66968000" />
-      <workItem from="1689987118343" duration="8660000" />
+      <workItem from="1689987118343" duration="9894000" />
+      <workItem from="1690045358508" duration="6222000" />
+      <workItem from="1690158470250" duration="1602000" />
+      <workItem from="1690161570136" duration="18325000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -215,7 +218,14 @@
       <option name="project" value="LOCAL" />
       <updated>1689914936687</updated>
     </task>
-    <option name="localTasksCounter" value="18" />
+    <task id="LOCAL-00018" summary="vector addition 추가">
+      <created>1690008377586</created>
+      <option name="number" value="00018" />
+      <option name="presentableId" value="LOCAL-00018" />
+      <option name="project" value="LOCAL" />
+      <updated>1690008377586</updated>
+    </task>
+    <option name="localTasksCounter" value="19" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -243,7 +253,8 @@
     <MESSAGE value="for문 scope 처리 적용" />
     <MESSAGE value="다변수함수 및 키워드 묶음 추가" />
     <MESSAGE value="키워드 '달려가' 추가" />
-    <option name="LAST_COMMIT_MESSAGE" value="키워드 '달려가' 추가" />
+    <MESSAGE value="vector addition 추가" />
+    <option name="LAST_COMMIT_MESSAGE" value="vector addition 추가" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
