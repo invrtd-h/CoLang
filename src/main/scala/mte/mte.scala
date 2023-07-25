@@ -54,10 +54,6 @@ package mte {
     override def toString: String = s"BF<$name>($arg)"
   }
 
-  private case class BuiltinFnV2V(fn: Value => Value, arg: Expr, name: String) extends Expr {
-    override def toString: String = s"BFV<$name>($arg)"
-  }
-
 
   // Values
   case class UnitV() extends Value {
@@ -205,7 +201,6 @@ package mte {
             case _: error.MteRuntimeErr => NumV(0)
           }
         case BuiltinFnE2E(fn, arg, _) => pret(fn(arg))
-        case BuiltinFnV2V(fn, arg, _) => fn(pret(arg))
       }
     }
   }
@@ -246,6 +241,15 @@ package mte {
     val valDiv = bigIntOpToValueOp(_ / _)
     val valGt = bigIntOpToValueOp(utility.gtInt)
     val valLogNot = bigIntOpToValueOp(utility.logNot)
+
+    def makePrintExpr(x: Expr, template: String): Expr = {
+      def ret(x: Value, @unused y: Value): Value = {
+        print(template.format(x))
+        x
+      }
+
+      BinaryOp(x, unitE, "print", ret)
+    }
 
     def vecAccess(vec: => Value, idx: => Value): Value = vec match {
       case VecV(data) => idx match {
@@ -304,9 +308,6 @@ package mte {
     def exprToFn(expr: Expr): Expr = Fun("", "_", expr)
 
     def newScope(expr: Expr): Expr = App(exprToFn(expr), unitE)
-
-    def makePrintExpr(expr: Expr, template: String = "%s"): Expr =
-      BuiltinFnV2V(v => builtin.write(v, template), expr, "print")
 
     def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
       Seq(
@@ -401,7 +402,7 @@ package mte {
 
     @unused def 릴(rhs: Expr): Expr = App(rhs, lhs)
 
-    @unused def 리액션(template: String): Expr = sugarbuilder.makePrintExpr(lhs, template)
+    @unused def 리액션(template: String): Expr = ops.makePrintExpr(lhs, template)
 
     @unused def 케바바바밥줘(rhs: Expr): Expr = Seq(lhs, rhs)
 
@@ -455,6 +456,7 @@ package mte {
     def 케바바바밥줘(expr: Expr): ProgramBuilder = factHelper(expr)
 
     private def factHelper(expr: Expr): ProgramBuilder = {
+      println(expr)
       val result: Value = program.mainFn.pret(expr)
       this
     }
@@ -858,7 +860,7 @@ package mte {
    * @return 프로그램 트리
    */
   @unused
-  def 리액션(expr: Expr, template: String = "%s"): Expr = sugarbuilder.makePrintExpr(expr, template)
+  def 리액션(expr: Expr, template: String = "%s"): Expr = ops.makePrintExpr(expr, template)
 
   package builtin {
     def readInt(@unused expr: Expr = UnitE()): Expr =
