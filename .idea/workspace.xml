@@ -4,8 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="vector addition 추가">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="print 구현을 바꿈">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -96,7 +97,7 @@
       <workItem from="1689987118343" duration="9894000" />
       <workItem from="1690045358508" duration="6222000" />
       <workItem from="1690158470250" duration="1602000" />
-      <workItem from="1690161570136" duration="20667000" />
+      <workItem from="1690161570136" duration="25570000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -231,7 +232,14 @@
       <option name="project" value="LOCAL" />
       <updated>1690237009969</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary="print 구현을 바꿈">
+      <created>1690258321561</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1690258321561</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -260,7 +268,8 @@
     <MESSAGE value="다변수함수 및 키워드 묶음 추가" />
     <MESSAGE value="키워드 '달려가' 추가" />
     <MESSAGE value="vector addition 추가" />
-    <option name="LAST_COMMIT_MESSAGE" value="vector addition 추가" />
+    <MESSAGE value="print 구현을 바꿈" />
+    <option name="LAST_COMMIT_MESSAGE" value="print 구현을 바꿈" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

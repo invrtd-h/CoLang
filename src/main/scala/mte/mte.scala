@@ -241,6 +241,15 @@ package mte {
     val valDiv = bigIntOpToValueOp(_ / _)
     val valGt = bigIntOpToValueOp(utility.gtInt)
     val valLogNot = bigIntOpToValueOp(utility.logNot)
+    val valRemainder = bigIntOpToValueOp(_ % _)
+    
+    def makeAddExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "add", valAdd)
+    def makeSubExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "sub", valSub)
+    def makeMulExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "mul", valMul)
+    def makeDivExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "div", valDiv)
+    def makeGtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "gt", valGt)
+    def makeLogNotExpr(lhs: Expr): Expr = BinaryOp(lhs, unitE, "logNot", valLogNot)
+    def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "%", valRemainder)
 
     def makePrintExpr(x: Expr, template: String): Expr = {
       def ret(x: Value, @unused y: Value): Value = {
@@ -308,6 +317,40 @@ package mte {
     def exprToFn(expr: Expr): Expr = Fun("", "_", expr)
 
     def newScope(expr: Expr): Expr = App(exprToFn(expr), unitE)
+    
+    def seqs(expressions: Expr*): Expr = {
+      @tailrec
+      def help(expressions: Vector[Expr], ret: Expr): Expr = {
+        if (expressions.nonEmpty) {
+          help(expressions.tail, Seq(ret, expressions.head))
+        } else {
+          ret
+        }
+      }
+      
+      if (expressions.length == 1) {
+        expressions.head
+      } else {
+        help(expressions.tail.toVector, expressions.head)
+      }
+    }
+    
+    def vecToSeq(vec: Vector[Expr]): Expr = {
+      @tailrec
+      def help(vec: Vector[Expr], ret: Expr): Expr = {
+        if (vec.nonEmpty) {
+          help(vec.tail, Seq(ret, vec.head))
+        } else {
+          ret
+        }
+      }
+      
+      if (vec.length == 1) {
+        vec.head
+      } else {
+        help(vec.tail, vec.head)
+      }
+    }
 
     def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
       Seq(
@@ -407,6 +450,10 @@ package mte {
     @unused def 케바바바밥줘(rhs: Expr): Expr = Seq(lhs, rhs)
 
     @unused def 꼽표(@unused rhs: EndState3): Expr = BinaryOp(lhs, Num(0), "LogNot", ops.valLogNot)
+    
+    @unused def 코가커요(rhs: Expr): Expr = ops.makeRemainderExpr(lhs, rhs)
+    
+    @unused def 반제곱(@unused rhs: EndState4): Expr = ???
   }
 
   @unused
@@ -450,14 +497,15 @@ package mte {
   case class ProgramBuilder(program: Program) {
     @targetName("fact")
     @unused
-    def ! (expr: Expr) : ProgramBuilder = factHelper(expr)
+    def ! (expr: Expr*) : ProgramBuilder = factHelper(expr.toVector)
 
     @unused
-    def 케바바바밥줘(expr: Expr): ProgramBuilder = factHelper(expr)
+    def 케바바바밥줘(expr: Expr*): ProgramBuilder = factHelper(expr.toVector)
 
-    private def factHelper(expr: Expr): ProgramBuilder = {
-      println(expr)
-      val result: Value = program.mainFn.pret(expr)
+    private def factHelper(expr: Vector[Expr]): ProgramBuilder = {
+      val sequencedExpr = sugarbuilder.vecToSeq(expr)
+      println(sequencedExpr)
+      val result: Value = program.mainFn.pret(sequencedExpr)
       this
     }
   }
@@ -664,6 +712,8 @@ package mte {
       sugarbuilder.newSimpleFor(iterName, lhs, rhs, forExpr)
   }
 
+  implicit class RunningForBuilderFromExpr(expr: Expr) extends RunningForBuilder(expr)
+  implicit class RunningForBuilderFromId(id: String) extends RunningForBuilder(Id(id))
   implicit class RunningForBuilderFromInt(n: Int) extends RunningForBuilder(Num(n))
 
   /**
@@ -780,6 +830,10 @@ package mte {
       for (arg <- args) ret = ret :+ arg
       ret
     }
+    
+    @unused
+    @targetName("factFactFactFact")
+    def !!!!(args: Expr*): Expr = sugarbuilder.vecToSeq(args.toVector)
   }
 
   /**
