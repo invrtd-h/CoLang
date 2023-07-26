@@ -23,7 +23,10 @@ package mte {
 
   case class UnitE() extends Expr
 
-  private case class BinaryOp(lhs: Expr, rhs: Expr, name: String, op: (=> Value, => Value) => Value) extends Expr {
+  private case class BinaryOp(lhs: Expr,
+                              rhs: Expr,
+                              name: String,
+                              op: (=> Value, => Value) => Either[String, Value]) extends Expr {
     override def toString: String =
       s"BO<$name>($lhs, $rhs)"
   }
@@ -102,6 +105,7 @@ package mte {
 
   case class ProcessFn(parentProcess: Process, var pEnv: Env) {
 
+    @unused
     @tailrec
     private def unbox(value: Value): Value = value match {
       case BoxV(addr) => parentProcess.pSto.get(addr) match {
@@ -115,7 +119,7 @@ package mte {
 
     private def fnCall(fnExpr: Expr, argExpr: Expr): Value = pret(fnExpr) match {
       case CloV(argName, fExpr, fEnv) =>
-        val argV: Value = pret(argExpr) |> unbox
+        val argV: Value = pret(argExpr)
         val newFn: ProcessFn = ProcessFn(parentProcess, fEnv + (argName -> argV))
         newFn.pret(fExpr)
       case err@_ => throw error.MteRuntimeErr(
@@ -127,11 +131,14 @@ package mte {
       expr match {
         case Num(data) => NumV(data)
         case UnitE() => unitV
-        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> unbox, pret(rhs) |> unbox)
+        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> unbox, pret(rhs) |> unbox) match {
+          case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
+          case Right(value) => value
+        }
         case Id(name) => pEnv.get(name) match {
           case Some(value) => value match {
             case NumV(num) => NumV(num - 3000 * name.count(_ == '코'))
-            case _ => value
+            case value@_ => value
           }
           case _ => throw error.MteRuntimeErr(
             s"얘! 컴파일쟁이($pEnv)들은 $name 이런 거 잘 몰라 임마!"
@@ -189,7 +196,7 @@ package mte {
               parentProcess.pSto += (addr -> setVal)
               setVal
             case err@_ => throw error.MteRuntimeErr(
-              s"얘! 지금 네 눈에 $err 이게 포인터로 보이니? env=$pEnv, sto=${parentProcess.pSto}"
+              s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 포인터로 보이니? env=$pEnv, sto=${parentProcess.pSto.toVector.sortBy((addr: Addr, value) => addr)}"
             )
           }
         case Vec(data) => VecV(data.map(pret))
@@ -209,29 +216,25 @@ package mte {
   val unitV: UnitV = UnitV()
 
   package ops {
-
     import java.lang.Package
 
-    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Value = {
-      def ret(lhs: => Value, rhs: => Value): Value = {
+    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Either[String, Value] = {
+      def ret(lhs: => Value, rhs: => Value): Either[String, Value] = {
         lhs match {
           case NumV(dataL) => rhs match {
-            case NumV(dataR) => NumV(op(dataL, dataR))
-            case _ => throw error.MteRuntimeErr(
-              s"얘! 여기 지금 $rhs 이게 숫자로 보이니??"
-            )
+            case NumV(dataR) => Right(NumV(op(dataL, dataR)))
+            case _ => Left(s"얘! 여기 지금 $rhs 이게 숫자로 보이니??")
           }
-          case _ => throw error.MteRuntimeErr(
-            s"얘! 여기 지금 $lhs 이게 숫자로 보이니??"
-          )
+          case _ => Left(s"얘! 여기 지금 $lhs 이게 숫자로 보이니??")
         }
       }
 
       ret
     }
 
-    def unaryToBinary(op: (=> Value) => Value): (=> Value, => Value) => Value = {
-      def ret(lhs: => Value, @unused rhs: => Value): Value = op(lhs)
+    def unaryToBinary(op: (=> Value) => Either[String, Value]): (=> Value, => Value) => Either[String, Value] = {
+      def ret(lhs: => Value, @unused rhs: => Value): Either[String, Value] = op(lhs)
+
       ret
     }
 
@@ -242,7 +245,7 @@ package mte {
     val valGt = bigIntOpToValueOp(utility.gtInt)
     val valLogNot = bigIntOpToValueOp(utility.logNot)
     val valRemainder = bigIntOpToValueOp(_ % _)
-    
+
     def makeAddExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "add", valAdd)
     def makeSubExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "sub", valSub)
     def makeMulExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "mul", valMul)
@@ -252,72 +255,67 @@ package mte {
     def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "%", valRemainder)
 
     def makePrintExpr(x: Expr, template: String): Expr = {
-      def ret(x: Value, @unused y: Value): Value = {
+      def ret(x: Value, @unused y: Value): Either[String, Value] = {
         print(template.format(x))
-        x
+        Right(x)
       }
 
       BinaryOp(x, unitE, "print", ret)
     }
 
-    def vecAccess(vec: => Value, idx: => Value): Value = vec match {
+    def vecAccess(vec: => Value, idx: => Value): Either[String, Value] = vec match {
       case VecV(data) => idx match {
         case NumV(n) =>
           if (n < 0 || n >= data.length)
-            throw error.MteRuntimeErr(
-              s"얘! 지금 idx=$n 이게 길이 ${data.length}짜리 뭉탱이에 접근이 되겠니??"
-            )
+            Left(s"얘! 지금 idx=$n 이게 길이 ${data.length}짜리 뭉탱이에 접근이 되겠니??")
           else
-            data(n.toInt)
-        case _ => throw error.MteRuntimeErr(
-          s"얘! 지금 뭉탱이 인덱스가 $idx 이게 숫자로 보이니??"
-        )
+            Right(data(n.toInt))
+        case _ => Left(s"얘! 지금 뭉탱이 인덱스가 $idx 이게 숫자로 보이니??")
       }
-      case _ => throw error.MteRuntimeErr(
-        s"얘! 지금 뭉탱이 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 뭉탱이로 보이냐??"
-      )
+      case _ => Left(s"얘! 지금 뭉탱이 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 뭉탱이로 보이냐??")
     }
 
     def makeVecAccessExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAccess", vecAccess)
 
-    def vecAppend(lhs: => Value, rhs: => Value): Value = lhs match {
-      case VecV(lData) => VecV(lData :+ rhs)
-      case _ => throw error.MteRuntimeErr(
-        s"얘! 지금 뭉탱이 원소 추가 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 여기다 뭘 넣겠다는 거니??"
-      )
+    def vecAppend(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
+      case VecV(lData) => Right(VecV(lData :+ rhs))
+      case _ => Left(s"얘! 지금 뭉탱이 원소 추가 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 여기다 뭘 넣겠다는 거니??")
     }
 
     def makeVecAppendExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAppend", vecAppend)
 
-    def vecExtension(lhs: => Value, rhs: => Value): Value = lhs match {
+    def vecExtension(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
       case VecV(lData) => rhs match {
-        case VecV(rData) => VecV(lData ++ rData)
-        case _ => throw error.MteRuntimeErr(
-          s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 뭉탱이로 보이냐??"
-        )
+        case VecV(rData) => Right(VecV(lData ++ rData))
+        case _ => Left(s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 뭉탱이로 보이냐??")
       }
-      case _ => throw error.MteRuntimeErr(
-        s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 뭉탱이로 보이냐??"
-      )
+      case _ => Left(s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 뭉탱이로 보이냐??")
     }
 
     def makeVecExtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecExt", vecExtension)
 
-    def vecSizeUnary(vec: => Value): Value = vec match {
-      case VecV(data) => NumV(data.length)
-      case _ => throw error.MteRuntimeErr(
-        s"얘! 지금 $vec 이게 뭉탱이로 보이냐??"
-      )
+    def vecSizeUnary(vec: => Value): Either[String, Value] = vec match {
+      case VecV(data) => Right(NumV(data.length))
+      case _ => Left(s"얘! 지금 $vec 이게 뭉탱이로 보이냐??")
     }
 
     val vecSize = unaryToBinary(vecSizeUnary)
+
+    def vecFill(size: => Value, init: => Value): Either[String, Value] = size match {
+      case NumV(data) => Right(VecV(Vector.fill(data.toInt) {init}))
+      case _ => Left(s"얘! 지금 나보고 ${size}개의 원소를 가진 벡터를 만들어 달라고 하면 어쩌자는 거니!")
+    }
+
+    def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = BinaryOp(sizeE, initE, "vecFill", vecFill)
+
+
   }
 
   package sugarbuilder {
     def exprToFn(expr: Expr): Expr = Fun("", "_", expr)
 
     def newScope(expr: Expr): Expr = App(exprToFn(expr), unitE)
-    
+
     def seqs(expressions: Expr*): Expr = {
       @tailrec
       def help(expressions: Vector[Expr], ret: Expr): Expr = {
@@ -327,14 +325,14 @@ package mte {
           ret
         }
       }
-      
+
       if (expressions.length == 1) {
         expressions.head
       } else {
         help(expressions.tail.toVector, expressions.head)
       }
     }
-    
+
     def vecToSeq(vec: Vector[Expr]): Expr = {
       @tailrec
       def help(vec: Vector[Expr], ret: Expr): Expr = {
@@ -344,7 +342,7 @@ package mte {
           ret
         }
       }
-      
+
       if (vec.length == 1) {
         vec.head
       } else {
@@ -354,7 +352,7 @@ package mte {
 
     def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
       Seq(
-        ValDef(iterName, NewBox(initExpr)),
+        ValDef(iterName, initExpr),
         WhileN0(condExpr, Seq(
           inExpr,
           manipulationExpr
@@ -364,8 +362,8 @@ package mte {
 
     def newSimpleFor(iterName: String, lbdInclusive: Expr, ubdExclusive: Expr, inExpr: Expr): Expr = newFor(
       iterName = iterName,
-      initExpr = lbdInclusive,
-      condExpr = BinaryOp(ubdExclusive, Id(iterName), "Gt", ops.valGt),
+      initExpr = NewBox(lbdInclusive),
+      condExpr = ops.makeGtExpr(ubdExclusive, Id(iterName)),
       manipulationExpr = SetBox(Id(iterName), Id(iterName) + 1),
       inExpr = inExpr
     )
@@ -450,9 +448,9 @@ package mte {
     @unused def 케바바바밥줘(rhs: Expr): Expr = Seq(lhs, rhs)
 
     @unused def 꼽표(@unused rhs: EndState3): Expr = BinaryOp(lhs, Num(0), "LogNot", ops.valLogNot)
-    
+
     @unused def 코가커요(rhs: Expr): Expr = ops.makeRemainderExpr(lhs, rhs)
-    
+
     @unused def 반제곱(@unused rhs: EndState4): Expr = ???
   }
 
@@ -778,6 +776,10 @@ package mte {
   case class BoxBuilder(expr: Expr) {
     @unused
     def 발행(@unused nft: NFT.type): Expr = NewBox(expr)
+
+    @unused
+    @targetName("rrArrow")
+    def -->(@unused nft: NFT.type): Expr = NewBox(expr)
   }
 
   implicit class BoxBuilderFromExpr(expr: Expr) extends BoxBuilder(expr)
@@ -830,7 +832,7 @@ package mte {
       for (arg <- args) ret = ret :+ arg
       ret
     }
-    
+
     @unused
     @targetName("factFactFactFact")
     def !!!!(args: Expr*): Expr = sugarbuilder.vecToSeq(args.toVector)
@@ -848,6 +850,9 @@ package mte {
     for (arg <- args) ret = ret :+ arg
     Vec(ret)
   }
+
+  @unused
+  def 왕뭉탱이(size: Expr, init: Expr): Expr = ops.makeVecFillExpr(size, init)
 
   /**
    * 문법: expr 갖고와 임마!! idx
