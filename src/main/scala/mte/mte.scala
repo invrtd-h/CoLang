@@ -8,7 +8,7 @@ package mte {
   @unused
   sealed trait Expr {
     @targetName("plus")
-    def +(rhs: Expr): Expr = BinaryOp(this, rhs, "plus", ops.valAdd)
+    def +(rhs: Expr): Expr = ops.makeAddExpr(this, rhs)
   }
 
   sealed trait Value
@@ -29,6 +29,13 @@ package mte {
                               op: (=> Value, => Value) => Either[String, Value]) extends Expr {
     override def toString: String =
       s"BO<$name>($lhs, $rhs)"
+  }
+
+  private case class TernaryOp(x: Expr, y: Expr, z: Expr,
+                               op: (Value, Value, Value) => Either[String, Value],
+                               name: String) extends Expr {
+    override def toString: String =
+      s"TO<$name>($x, $y, $z)"
   }
 
   private case class Id(name: String) extends Expr
@@ -135,6 +142,10 @@ package mte {
           case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
           case Right(value) => value
         }
+        case TernaryOp(x, y, z, op, _) => op(pret(x) |> unbox, pret(y) |> unbox, pret(z) |> unbox) match {
+          case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
+          case Right(value) => value
+        }
         case Id(name) => pEnv.get(name) match {
           case Some(value) => value match {
             case NumV(num) => NumV(num - 3000 * name.count(_ == '코'))
@@ -218,7 +229,7 @@ package mte {
   package ops {
     import java.lang.Package
 
-    def bigIntOpToValueOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Either[String, Value] = {
+    def liftBinaryOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Either[String, Value] = {
       def ret(lhs: => Value, rhs: => Value): Either[String, Value] = {
         lhs match {
           case NumV(dataL) => rhs match {
@@ -232,26 +243,33 @@ package mte {
       ret
     }
 
+    def liftUnaryOp(op: BigInt => BigInt): (=> Value, => Value) => Either[String, Value] = {
+      def ret(lhs: => Value, @unused rhs: => Value): Either[String, Value] = lhs match {
+        case NumV(data) => Right(NumV(op(data)))
+        case _ => Left(s"얘! 여기 지금 $lhs 이게 숫자로 보이니??")
+      }
+
+      ret
+    }
+
     def unaryToBinary(op: (=> Value) => Either[String, Value]): (=> Value, => Value) => Either[String, Value] = {
       def ret(lhs: => Value, @unused rhs: => Value): Either[String, Value] = op(lhs)
 
       ret
     }
 
-    val valAdd = bigIntOpToValueOp(_ + _)
-    val valSub = bigIntOpToValueOp(_ - _)
-    val valMul = bigIntOpToValueOp(_ * _)
-    val valDiv = bigIntOpToValueOp(_ / _)
-    val valGt = bigIntOpToValueOp(utility.gtInt)
-    val valLogNot = bigIntOpToValueOp(utility.logNot)
-    val valRemainder = bigIntOpToValueOp(_ % _)
+    val valSub = liftBinaryOp(_ - _)
+    val valMul = liftBinaryOp(_ * _)
+    val valDiv = liftBinaryOp(_ / _)
+    val valRemainder = liftBinaryOp(_ % _)
 
-    def makeAddExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "add", valAdd)
+    def makeAddExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "add", liftBinaryOp(_ + _))
     def makeSubExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "sub", valSub)
     def makeMulExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "mul", valMul)
     def makeDivExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "div", valDiv)
-    def makeGtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "gt", valGt)
-    def makeLogNotExpr(lhs: Expr): Expr = BinaryOp(lhs, unitE, "logNot", valLogNot)
+    def makeGtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "gt", liftBinaryOp(utility.gtInt))
+    def makeGeExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "ge", liftBinaryOp(utility.geInt))
+    def makeLogNotExpr(lhs: Expr): Expr = BinaryOp(lhs, unitE, "logNot", liftUnaryOp(utility.logNot))
     def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "%", valRemainder)
 
     def makePrintExpr(x: Expr, template: String): Expr = {
@@ -301,14 +319,39 @@ package mte {
 
     val vecSize = unaryToBinary(vecSizeUnary)
 
-    def vecFill(size: => Value, init: => Value): Either[String, Value] = size match {
-      case NumV(data) => Right(VecV(Vector.fill(data.toInt) {init}))
-      case _ => Left(s"얘! 지금 나보고 ${size}개의 원소를 가진 벡터를 만들어 달라고 하면 어쩌자는 거니!")
+    def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = {
+      def vecFill(size: => Value, init: => Value): Either[String, Value] = size match {
+        case NumV(data) => Right(VecV(Vector.fill(data.toInt) {
+          init
+        }))
+        case _ => Left(s"얘! 지금 나보고 ${size}개의 원소를 가진 벡터를 만들어 달라고 하면 어쩌자는 거니!")
+      }
+
+      BinaryOp(sizeE, initE, "vecFill", vecFill)
     }
 
-    def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = BinaryOp(sizeE, initE, "vecFill", vecFill)
+  }
 
+  package ops3 {
+    def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] = cond match {
+      case NumV(data) => if (data != 0) Right(yes) else Right(no)
+      case _ => Left(s"얘! 지금 네 눈에 $cond 이게 boolean 취급할 수 있는 값처럼 보이니?? 죽여벌랑")
+    }
+    def makeVecUpdatedExpr(vecE: Expr, idxE: Expr, dataE: Expr): Expr = {
+      def vecUpdated(vec: => Value, idx: => Value, data: => Value): Either[String, Value] = vec match {
+        case VecV(vec) => idx match {
+          case NumV(idx) =>
+            if (idx < 0 || idx >= vec.length)
+              Left(s"얘! 지금 idx=$idx 이게 길이 ${vec.length}짜리 뭉탱이에 접근이 되겠니??")
+            else
+              Right(VecV(vec.updated(idx.toInt, data)))
+          case _ => Left(s"얘! 지금 뭉탱이 인덱스가 $idx 이게 숫자로 보이니??")
+        }
+        case _ => Left(s"얘! 지금 뭉탱이 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 뭉탱이로 보이냐??")
+      }
 
+      TernaryOp(vecE, idxE, dataE, vecUpdated, "vecUpdate")
+    }
   }
 
   package sugarbuilder {
@@ -433,13 +476,13 @@ package mte {
   }
 
   class ExprOps(lhs: Expr) {
-    @unused def 배(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Add", ops.valAdd)
+    @unused def 배(rhs: Expr): Expr = ops.makeAddExpr(lhs, rhs)
 
-    @unused def 코(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Sub", ops.valSub)
+    @unused def 코(rhs: Expr): Expr = ops.makeSubExpr(lhs, rhs)
 
-    @unused def 조이고(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Mul", ops.valMul)
+    @unused def 조이고(rhs: Expr): Expr = ops.makeMulExpr(lhs, rhs)
 
-    @unused def 법회(rhs: Expr): Expr = BinaryOp(lhs, rhs, "Div", ops.valDiv)
+    @unused def 법회(rhs: Expr): Expr = ops.makeDivExpr(lhs, rhs)
 
     @unused def 릴(rhs: Expr): Expr = App(rhs, lhs)
 
@@ -447,7 +490,7 @@ package mte {
 
     @unused def 케바바바밥줘(rhs: Expr): Expr = Seq(lhs, rhs)
 
-    @unused def 꼽표(@unused rhs: EndState3): Expr = BinaryOp(lhs, Num(0), "LogNot", ops.valLogNot)
+    @unused def 꼽표(@unused rhs: EndState3): Expr = ops.makeLogNotExpr(lhs)
 
     @unused def 코가커요(rhs: Expr): Expr = ops.makeRemainderExpr(lhs, rhs)
 
@@ -470,6 +513,7 @@ package mte {
   case class EndState2() extends EndState
   case class EndState3() extends EndState
   case class EndState4() extends EndState
+  case class EndState5() extends EndState
 
 
   @unused val 뭉: Num = Num(1)
@@ -513,10 +557,13 @@ package mte {
   @targetName("notFact")
   val ~! = EndState1()
 
-
   @unused
   @targetName("quesQues")
   val ?? = EndState2()
+
+  @unused
+  @targetName("eqQuesQues")
+  val =?? = EndState5()
 
   // 를! "x"
   @unused
@@ -716,7 +763,7 @@ package mte {
 
   /**
    * 도네 금액이 케인인님의 마음에 들지 판단한단다.
-   * 문법: (lhs) 돈 (rhs) 원에??
+   * 문법: (lhs) 돈 (rhs) 원에??/?=?
    * @param lhs lhs
    */
   case class GtBuilder(lhs: Expr) {
@@ -726,8 +773,10 @@ package mte {
 
     case class GtBuilder2(lhs: Expr, rhs: Expr) {
       @unused
-      def 원에(@unused x: EndState2): Expr =
-        BinaryOp(lhs, rhs, "Gt", ops.valGt)
+      def 원에(@unused x: EndState2): Expr = ops.makeGtExpr(lhs, rhs)
+
+      @unused
+      def 원에(@unused x: EndState5): Expr = ops.makeGeExpr(lhs, rhs)
     }
   }
 
@@ -854,27 +903,6 @@ package mte {
   @unused
   def 왕뭉탱이(size: Expr, init: Expr): Expr = ops.makeVecFillExpr(size, init)
 
-  /**
-   * 문법: expr 갖고와 임마!! idx
-   * @param lhs expr
-   */
-  case class VecAccessBuilder(lhs: Expr) {
-    import 임마.VecAccessRhsBuilder
-    @unused
-    def 갖고와(accIdxWrapper: VecAccessRhsBuilder): Expr = ops.makeVecAccessExpr(lhs, accIdxWrapper.accIdx)
-  }
-
-  case object 임마 {
-    @unused
-    @targetName("factFact")
-    def !!(accIdx: Expr): VecAccessRhsBuilder = VecAccessRhsBuilder(accIdx)
-
-    case class VecAccessRhsBuilder(accIdx: Expr)
-  }
-
-  implicit class VecAccessBuilderFromExpr(lhs: Expr) extends VecAccessBuilder(lhs)
-  implicit class VecAccessBuilderFromId(id: String) extends VecAccessBuilder(Id(id))
-  implicit class VecAccessBuilderFromInt(num: Int) extends VecAccessBuilder(Num(num))
 
   case class VecOpsBuilder(lhs: Expr) {
     /**
@@ -892,6 +920,37 @@ package mte {
      */
     @unused
     def 즐기면서가자(fn: Expr): Expr = ???
+
+    import 임마.VecAccessRhsBuilder
+
+    @unused
+    def 갖고와(accIdxWrapper: VecAccessRhsBuilder): Expr = ops.makeVecAccessExpr(lhs, accIdxWrapper.accIdx)
+
+    import 한판마안.VecUpdateRhsBuilder
+
+    @unused
+    def 갖고와(idxE: Expr): VecUpdateBuilder = VecUpdateBuilder(lhs, idxE)
+
+    case class VecUpdateBuilder(vecE: Expr, idxE: Expr) {
+      @unused
+      def 할게(rhs: VecUpdateRhsBuilder): Expr = ops3.makeVecUpdatedExpr(vecE, idxE, rhs.updateE)
+    }
+  }
+
+  case object 임마 {
+    @unused
+    @targetName("factFact")
+    def !!(accIdx: Expr): VecAccessRhsBuilder = VecAccessRhsBuilder(accIdx)
+
+    case class VecAccessRhsBuilder(accIdx: Expr)
+  }
+
+  case object 한판마안 {
+    @unused
+    @targetName("notNotFactFact")
+    def ~~!!(updateE: Expr): VecUpdateRhsBuilder = VecUpdateRhsBuilder(updateE)
+
+    case class VecUpdateRhsBuilder(updateE: Expr)
   }
 
   implicit class VecOpsBuilderFromExpr(lhs: Expr) extends VecOpsBuilder(lhs)
@@ -976,7 +1035,10 @@ package mte {
     def gtInt(lhs: BigInt, rhs: BigInt): BigInt =
       if (lhs > rhs) 1 else 0
 
-    def logNot(lhs: BigInt, @unused rhs: BigInt): BigInt =
+    def geInt(lhs: BigInt, rhs: BigInt): BigInt =
+      if (lhs >= rhs) 1 else 0
+
+    def logNot(lhs: BigInt): BigInt =
       if (lhs == 0) 1 else 0
 
     def makeKillFn(msg: String): Expr => Expr = {
