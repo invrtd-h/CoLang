@@ -21,21 +21,23 @@ package mte {
   @unused
   case class Num(data: BigInt) extends Expr
 
-  case class UnitE() extends Expr
+  case class UnitE() extends Expr {
+    override def toString: String = "unit"
+  }
 
   private case class BinaryOp(lhs: Expr,
                               rhs: Expr,
                               name: String,
                               op: (=> Value, => Value) => Either[String, Value]) extends Expr {
     override def toString: String =
-      s"BO<$name>($lhs, $rhs)"
+      s"<$name>($lhs, $rhs)"
   }
 
   private case class TernaryOp(x: Expr, y: Expr, z: Expr,
                                op: (Value, Value, Value) => Either[String, Value],
                                name: String) extends Expr {
     override def toString: String =
-      s"TO<$name>($x, $y, $z)"
+      s"<$name>($x, $y, $z)"
   }
 
   private case class Id(name: String) extends Expr
@@ -394,12 +396,14 @@ package mte {
     }
 
     def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
-      Seq(
-        ValDef(iterName, initExpr),
-        WhileN0(condExpr, Seq(
-          inExpr,
-          manipulationExpr
-        ))
+      newScope(
+        Seq(
+          ValDef(iterName, initExpr),
+          WhileN0(condExpr, Seq(
+            inExpr,
+            manipulationExpr
+          ))
+        )
       )
     }
 
@@ -581,12 +585,13 @@ package mte {
   case object 유링게슝한 {
     @targetName("question")
     @unused
-    def ?(condExpr: Expr)(trueExpr: Expr): Ifn0Builder =
-      Ifn0Builder(condExpr, trueExpr)
+    def ?(condExpr: Expr)(trueExprs: Expr*): Ifn0Builder =
+      Ifn0Builder(condExpr, sugarbuilder.vecToSeq(trueExprs.toVector))
 
     case class Ifn0Builder(condExpr: Expr, trueExpr: Expr) {
       @unused
-      def 안유링게슝(falseExpr: Expr): Expr = IfN0(condExpr, trueExpr, falseExpr)
+      def 안유링게슝(falseExprs: Expr*): Expr = 
+        IfN0(condExpr, trueExpr, sugarbuilder.vecToSeq(falseExprs.toVector))
     }
   }
 
@@ -723,13 +728,13 @@ package mte {
 
   /**
    * 케인님이 조건문이 거짓이 되기 전까지 강제연결을 해 주신단다!
-   * 문법: 강제연결 (cond) {expr}
+   * 문법: 강제연결 (cond) {expr}결
    * @param cond 조건문
    * @param exprIn 조건문이 참인 동안 실행할 명령
    */
   @unused
-  def 강제연결(cond: Expr)(exprIn: Expr): Expr = {
-    WhileN0(cond, exprIn)
+  def 강제연결(cond: Expr)(exprIn: Expr*): Expr = {
+    WhileN0(cond, sugarbuilder.vecToSeq(exprIn.toVector))
   }
 
   /**
@@ -763,7 +768,7 @@ package mte {
 
   /**
    * 도네 금액이 케인인님의 마음에 들지 판단한단다.
-   * 문법: (lhs) 돈 (rhs) 원에??/?=?
+   * 문법: (lhs) 돈 (rhs) 원에??/=??
    * @param lhs lhs
    */
   case class GtBuilder(lhs: Expr) {
@@ -1030,7 +1035,7 @@ package mte {
      * 얘! 내가 이런 함수까지 일일이 다 주석을 달아야 되니? 귀찮아!
      * @param lhs 아 귀찮아~~~!!!!!
      * @param rhs 아 귀찮아~~~!!!!!
-     * @return
+     * @return lhs > rhs
      */
     def gtInt(lhs: BigInt, rhs: BigInt): BigInt =
       if (lhs > rhs) 1 else 0
@@ -1040,6 +1045,9 @@ package mte {
 
     def logNot(lhs: BigInt): BigInt =
       if (lhs == 0) 1 else 0
+
+    def maxInt(lhs: BigInt, rhs: BigInt): BigInt =
+      if (lhs > rhs) lhs else rhs
 
     def makeKillFn(msg: String): Expr => Expr = {
       def ret(unitE: Expr): Expr = {
