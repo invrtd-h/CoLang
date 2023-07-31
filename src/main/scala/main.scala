@@ -2,28 +2,8 @@ import mte._
 import scala.language.postfixOps
 import scala.annotation.unused
 
-def make1(): Int = {
-  println("1 made")
-  1
-}
-
-def make2(): Int = {
-  println("2 made")
-  2
-}
-
-def make3(): Int = {
-  println("3 made")
-  3
-}
-
-def myIf(cond: => Int, tr: => Int, fa: => Int): Int = {
-  if (cond != 0) tr else fa
-}
-
 @main
 def main(): Unit = {
-  myIf(make1(), make2(), make3())
   구구단2()
   팩토리얼()
 
@@ -34,6 +14,7 @@ def main(): Unit = {
   vd.validate(test4)
   vd.validate(test5)
   vd.validate(test6)
+  vd.validate(test7)
 }
 
 def ㄴ찍기(): Unit = {
@@ -55,7 +36,7 @@ def ㄴ찍기(): Unit = {
 def test3(): Unit = {
   춘잣! {
     아니세상에 자기가 "함수" 라는사람인데 {
-      "x" +++ "y" +++ "z"는 ("x" 배 "y" 코 "z")다 게이조이고
+      묶음!!("x", "y", "z")는 ("x" 배 "y" 코 "z")다 게이조이고
     } 를 했대
   } 케바바바밥줘 {
     정품 맞어 {
@@ -131,6 +112,15 @@ def test6(): Unit = {
       } 안유링게슝 스키비야
     },
     스키비야 리액션 "\n"
+  )
+}
+
+def test7(): Unit = {
+  춘잣! (
+    아니세상에 자기가 "함수" 라는사람인데 (
+      묶음!!("뭉", "탱") 은 ("뭉" 조이고 "탱")이다 게이조이고
+    ) 를 했대,
+    "함수"야 묶음!!(6, 9) 먹어라?? 리액션 "%s\n"
   )
 }
 

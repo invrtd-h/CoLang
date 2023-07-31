@@ -332,6 +332,22 @@ package mte {
       BinaryOp(sizeE, initE, "vecFill", vecFill)
     }
 
+    def makeVecDropRightExpr(vecE: Expr, dropNumE: Expr): Expr = {
+      def vecDropRight(vec: => Value, dropNum: => Value): Either[String, Value] = vec match {
+        case VecV(vec) => dropNum match {
+          case NumV(num) =>
+            if (vec.length < num) {
+              Left(s"얘! 지금 원소 ${vec.length}짜리 뭉탱이에서 ${num}개짜리 원소를 떨어뜨리겠다는 게 말이 되니??")
+            } else {
+              Right(VecV(vec.dropRight(num.toInt)))
+            }
+          case _ => Left(s"얘! 지금 $dropNum 이게 숫자로 보이니??")
+        }
+        case _ => Left(s"얘! 지금 $vec 이게 뭉탱이로 보이냐??")
+      }
+
+      BinaryOp(vecE, dropNumE, "vecDropRight", vecDropRight)
+    }
   }
 
   package ops3 {
@@ -590,7 +606,7 @@ package mte {
 
     case class Ifn0Builder(condExpr: Expr, trueExpr: Expr) {
       @unused
-      def 안유링게슝(falseExprs: Expr*): Expr = 
+      def 안유링게슝(falseExprs: Expr*): Expr =
         IfN0(condExpr, trueExpr, sugarbuilder.vecToSeq(falseExprs.toVector))
     }
   }
@@ -694,8 +710,13 @@ package mte {
       def 이다(@unused joyGo: EndState4): Expr = sugarbuilder.newMultivariableLambda(argIds, fnExpr)
     }
   }
+  
+  def vecIdToVecString(vec: Vector[Expr]): Vector[String] = vec.map {
+    case Id(id) => id
+    case _ => throw error.MteSyntaxErr("")
+  }
 
-  implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[String]) extends MultiLambdaBuilder(argIds)
+  implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[Expr]) extends MultiLambdaBuilder(vecIdToVecString(argIds))
   implicit class MultiLambdaBuilderFromStr(argName: String) extends MultiLambdaBuilder(Vector(argName))
 
   /**
@@ -940,6 +961,15 @@ package mte {
       @unused
       def 할게(rhs: VecUpdateRhsBuilder): Expr = ops3.makeVecUpdatedExpr(vecE, idxE, rhs.updateE)
     }
+
+    /**
+     * 케인님이 ㄸㄸㅆ를 통해 뭉탱이에서 가장 오른쪽에 있는 n개의 원소를 제거해 주실 거예요~
+     * 문법: vec ㄸㄸㅆ num
+     * @param rhs num
+     * @return dropRight을 나타내는 표현식
+     */
+    @unused
+    def ㄸㄸㅆ(rhs: Expr): Expr = ops.makeVecDropRightExpr(lhs, rhs)
   }
 
   case object 임마 {
@@ -1022,7 +1052,7 @@ package mte {
      * @return 변수 이름
      */
     def randomNameGen(): String =
-      s"%rsvd%_${randomStringGen(21)}%_%"
+      s"%rsvd%_${randomStringGen(21)}%"
 
     def randBetween(lbdInclusive: Int, ubdExclusive: Int): Int =
       rand.between(lbdInclusive, ubdExclusive)
