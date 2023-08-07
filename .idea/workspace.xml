@@ -4,8 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="리팩토링">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="묶음!! 키워드를 변수 정의에도 쓸 수 있음">
+      <change afterPath="$PROJECT_DIR$/img/mte-does-like-this.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
     </list>
@@ -56,6 +58,11 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/png" />
+    </key>
+  </component>
   <component name="RunManager">
     <configuration name="main" type="Application" factoryName="Application" temporary="true">
       <option name="MAIN_CLASS_NAME" value="main" />
@@ -97,7 +104,12 @@
       <workItem from="1689987118343" duration="9894000" />
       <workItem from="1690045358508" duration="6222000" />
       <workItem from="1690158470250" duration="1602000" />
-      <workItem from="1690161570136" duration="64138000" />
+      <workItem from="1690161570136" duration="68385000" />
+      <workItem from="1690942260542" duration="23000" />
+      <workItem from="1690942285200" duration="17000" />
+      <workItem from="1690942305433" duration="184000" />
+      <workItem from="1690950484864" duration="2883000" />
+      <workItem from="1691389465635" duration="1792000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -267,7 +279,14 @@
       <option name="project" value="LOCAL" />
       <updated>1690522927119</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="묶음!! 키워드를 변수 정의에도 쓸 수 있음">
+      <created>1690784759177</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1690784759177</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -299,7 +318,8 @@
     <MESSAGE value="print 구현을 바꿈" />
     <MESSAGE value="에러 메시지를 더 잘 처리할 수 있게 BinaryOp 구현을 바꿈" />
     <MESSAGE value="리팩토링" />
-    <option name="LAST_COMMIT_MESSAGE" value="리팩토링" />
+    <MESSAGE value="묶음!! 키워드를 변수 정의에도 쓸 수 있음" />
+    <option name="LAST_COMMIT_MESSAGE" value="묶음!! 키워드를 변수 정의에도 쓸 수 있음" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

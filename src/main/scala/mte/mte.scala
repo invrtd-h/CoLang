@@ -1,4 +1,6 @@
 package mte {
+  import mte.확대하셨군요.RhsBuilder
+
   import scala.annotation.{tailrec, targetName, unused}
   import scala.language.implicitConversions
   import scala.util.Random
@@ -287,19 +289,19 @@ package mte {
       case VecV(data) => idx match {
         case NumV(n) =>
           if (n < 0 || n >= data.length)
-            Left(s"얘! 지금 idx=$n 이게 길이 ${data.length}짜리 뭉탱이에 접근이 되겠니??")
+            Left(s"얘! 지금 idx=$n 이게 길이 ${data.length}짜리 한줄서기에 접근이 되겠니??")
           else
             Right(data(n.toInt))
-        case _ => Left(s"얘! 지금 뭉탱이 인덱스가 $idx 이게 숫자로 보이니??")
+        case _ => Left(s"얘! 지금 한줄서기 인덱스가 $idx 이게 숫자로 보이니??")
       }
-      case _ => Left(s"얘! 지금 뭉탱이 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 뭉탱이로 보이냐??")
+      case _ => Left(s"얘! 지금 한줄서기 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 한줄서기로 보이냐??")
     }
 
     def makeVecAccessExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAccess", vecAccess)
 
     def vecAppend(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
       case VecV(lData) => Right(VecV(lData :+ rhs))
-      case _ => Left(s"얘! 지금 뭉탱이 원소 추가 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 여기다 뭘 넣겠다는 거니??")
+      case _ => Left(s"얘! 지금 한줄서기 원소 추가 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 여기다 뭘 넣겠다는 거니??")
     }
 
     def makeVecAppendExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAppend", vecAppend)
@@ -307,16 +309,16 @@ package mte {
     def vecExtension(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
       case VecV(lData) => rhs match {
         case VecV(rData) => Right(VecV(lData ++ rData))
-        case _ => Left(s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 뭉탱이로 보이냐??")
+        case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 한줄서기로 보이냐??")
       }
-      case _ => Left(s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 뭉탱이로 보이냐??")
+      case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 한줄서기로 보이냐??")
     }
 
     def makeVecExtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecExt", vecExtension)
 
     def vecSizeUnary(vec: => Value): Either[String, Value] = vec match {
       case VecV(data) => Right(NumV(data.length))
-      case _ => Left(s"얘! 지금 $vec 이게 뭉탱이로 보이냐??")
+      case _ => Left(s"얘! 지금 $vec 이게 한줄서기로 보이냐??")
     }
 
     val vecSize = unaryToBinary(vecSizeUnary)
@@ -337,13 +339,13 @@ package mte {
         case VecV(vec) => dropNum match {
           case NumV(num) =>
             if (vec.length < num) {
-              Left(s"얘! 지금 원소 ${vec.length}짜리 뭉탱이에서 ${num}개짜리 원소를 떨어뜨리겠다는 게 말이 되니??")
+              Left(s"얘! 지금 원소 ${vec.length}짜리 한줄서기에서 ${num}개짜리 원소를 떨어뜨리겠다는 게 말이 되니??")
             } else {
               Right(VecV(vec.dropRight(num.toInt)))
             }
           case _ => Left(s"얘! 지금 $dropNum 이게 숫자로 보이니??")
         }
-        case _ => Left(s"얘! 지금 $vec 이게 뭉탱이로 보이냐??")
+        case _ => Left(s"얘! 지금 $vec 이게 한줄서기로 보이냐??")
       }
 
       BinaryOp(vecE, dropNumE, "vecDropRight", vecDropRight)
@@ -360,12 +362,12 @@ package mte {
         case VecV(vec) => idx match {
           case NumV(idx) =>
             if (idx < 0 || idx >= vec.length)
-              Left(s"얘! 지금 idx=$idx 이게 길이 ${vec.length}짜리 뭉탱이에 접근이 되겠니??")
+              Left(s"얘! 지금 idx=$idx 이게 길이 ${vec.length}짜리 한줄서기에 접근이 되겠니??")
             else
               Right(VecV(vec.updated(idx.toInt, data)))
-          case _ => Left(s"얘! 지금 뭉탱이 인덱스가 $idx 이게 숫자로 보이니??")
+          case _ => Left(s"얘! 지금 한줄서기 인덱스가 $idx 이게 숫자로 보이니??")
         }
-        case _ => Left(s"얘! 지금 뭉탱이 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 뭉탱이로 보이냐??")
+        case _ => Left(s"얘! 지금 한줄서기 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 한줄서기로 보이냐??")
       }
 
       TernaryOp(vecE, idxE, dataE, vecUpdated, "vecUpdate")
@@ -594,7 +596,40 @@ package mte {
   }
 
   /**
-   * 주어진 조건이 유링게슝하면 앞부분을, 유링게슝하지 않으면 뒷부분을 실행한단다. 뒷부분은 안돼 임마!
+   * 곱셈 연산이다 맨이야.
+   * 문법: (lhs) 화면을 확대하셨군요!! (rhs)
+   * @param lhs lhs
+   */
+  case class MulBuilder(lhs: Expr) {
+    import 확대하셨군요.RhsBuilder
+
+    /**
+     * 곱셈 연산이다 맨이야.
+     * 문법: (lhs) 화면을 확대하셨군요!! (rhs)
+     * @param rhs rhs
+     */
+    @unused
+    def 화면을(rhs: RhsBuilder): Expr = ops.makeMulExpr(lhs, rhs.rhs)
+  }
+  
+  implicit class MulBuilderFromExpr(lhs: Expr) extends MulBuilder(lhs)
+  implicit class MulBuilderFromId(id: String) extends MulBuilder(Id(id))
+  implicit class MulBuilderFromInt(n: Int) extends MulBuilder(Num(n))
+
+  /**
+   * 곱셈 연산이다 맨이야.
+   * 문법: (lhs) 화면을 확대하셨군요!! (rhs)
+   */
+  case object 확대하셨군요 {
+    @unused
+    @targetName("factFact")
+    def !!(rhs: Expr): RhsBuilder = RhsBuilder(rhs)
+    
+    case class RhsBuilder(rhs: Expr)
+  }
+
+  /**
+   * 주어진 조건이 유링게슝하면 앞부분을, 유링게슝하지 않으면 뒷부분을 실행한단다. 뒷부분은 안돼 임마!!
    * 문법: (유링게슝한?) (expr) {expr} 안유링게슝 {expr}
    */
   @unused
@@ -710,10 +745,10 @@ package mte {
       def 이다(@unused joyGo: EndState4): Expr = sugarbuilder.newMultivariableLambda(argIds, fnExpr)
     }
   }
-  
+
   def vecIdToVecString(vec: Vector[Expr]): Vector[String] = vec.map {
     case Id(id) => id
-    case _ => throw error.MteSyntaxErr("")
+    case _ => throw error.MteSyntaxErr(s"얘! 지금 $vec 이게 변수명으로 보이니?!?!")
   }
 
   implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[Expr]) extends MultiLambdaBuilder(vecIdToVecString(argIds))
@@ -914,20 +949,20 @@ package mte {
   }
 
   /**
-   * 자~ 나쁜놈이 이렇게 뭉탱이를 만든다고 했는데, 이건 벡터를 만드는 문법이지~ 뭉탱이를 만드는 문법이 아니에요~~ 꼽표~~
+   * 한줄서기 벡터를 만드는 문법이에요~
    * @param args 벡터를 구성하는 원소들 (variadic)
    * @return 벡터에 해당하는 표현식
    * @return 벡터에 해당하는 표현식
    */
   @unused
-  def 뭉탱이(args: Expr*): Expr = {
+  def 한줄서기(args: Expr*): Expr = {
     var ret: Vector[Expr] = Vector()
     for (arg <- args) ret = ret :+ arg
     Vec(ret)
   }
 
   @unused
-  def 왕뭉탱이(size: Expr, init: Expr): Expr = ops.makeVecFillExpr(size, init)
+  def 왕한줄서기(size: Expr, init: Expr): Expr = ops.makeVecFillExpr(size, init)
 
 
   case class VecOpsBuilder(lhs: Expr) {
@@ -947,6 +982,14 @@ package mte {
     @unused
     def 즐기면서가자(fn: Expr): Expr = ???
 
+    /**
+     * 문법: vec 씻구 fn
+     * @param fn
+     * @return
+     */
+    @unused
+    def 씻구(fn: Expr): Expr = ???
+
     import 임마.VecAccessRhsBuilder
 
     @unused
@@ -963,7 +1006,7 @@ package mte {
     }
 
     /**
-     * 케인님이 ㄸㄸㅆ를 통해 뭉탱이에서 가장 오른쪽에 있는 n개의 원소를 제거해 주실 거예요~
+     * 케인님이 ㄸㄸㅆ를 통해 한줄서기에서 가장 오른쪽에 있는 n개의 원소를 제거해 주실 거예요~
      * 문법: vec ㄸㄸㅆ num
      * @param rhs num
      * @return dropRight을 나타내는 표현식
