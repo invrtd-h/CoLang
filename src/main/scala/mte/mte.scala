@@ -62,6 +62,8 @@ package mte {
 
   private case class Vec(data: Vector[Expr]) extends Expr
 
+  private case class HMap(data: Map[Expr, Expr]) extends Expr
+
   private case class Try(exprTry: Expr) extends Expr
 
   private case class BuiltinFnE2E(fn: Expr => Expr, arg: Expr, name: String) extends Expr {
@@ -83,6 +85,8 @@ package mte {
   }
 
   private case class VecV(data: Vector[Value]) extends Value
+
+  private case class HMapV(data: Map[Value, Value]) extends Value
 
   private case class BoxV(addr: Addr) extends Value {
     /**
@@ -211,10 +215,13 @@ package mte {
               parentProcess.pSto += (addr -> setVal)
               setVal
             case err@_ => throw error.MteRuntimeErr(
-              s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 포인터로 보이니? env=$pEnv, sto=${parentProcess.pSto.toVector.sortBy((addr: Addr, value) => addr)}"
+              s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$pEnv, sto=${
+                parentProcess.pSto.toVector.sortBy((addr: Addr, _) => addr)
+              }"
             )
           }
         case Vec(data) => VecV(data.map(pret))
+        case HMap(data) => HMapV(data.map((key, value) => (pret(key), pret(value))))
         case Try(exprTry) =>
           try {
             pret(exprTry)
@@ -256,12 +263,6 @@ package mte {
       ret
     }
 
-    def unaryToBinary(op: (=> Value) => Either[String, Value]): (=> Value, => Value) => Either[String, Value] = {
-      def ret(lhs: => Value, @unused rhs: => Value): Either[String, Value] = op(lhs)
-
-      ret
-    }
-
     val valSub = liftBinaryOp(_ - _)
     val valMul = liftBinaryOp(_ * _)
     val valDiv = liftBinaryOp(_ / _)
@@ -276,6 +277,15 @@ package mte {
     def makeLogNotExpr(lhs: Expr): Expr = BinaryOp(lhs, unitE, "logNot", liftUnaryOp(utility.logNot))
     def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "%", valRemainder)
 
+    def makeSqrtExpr(lhs: Expr): Expr = {
+      def sqrt(value: => Value, @unused x: => Value): Either[String, Value] = value match {
+        case NumV(data) => Right(NumV(math.sqrt(data.doubleValue).floor.toLong))
+        case _ => Left(s"얘! 지금 $value 이게 숫자로 보이니??")
+      }
+
+      BinaryOp(lhs, unitE, "sqrt", sqrt)
+    }
+
     def makePrintExpr(x: Expr, template: String): Expr = {
       def ret(x: Value, @unused y: Value): Either[String, Value] = {
         print(template.format(x))
@@ -285,7 +295,20 @@ package mte {
       BinaryOp(x, unitE, "print", ret)
     }
 
-    def vecAccess(vec: => Value, idx: => Value): Either[String, Value] = vec match {
+    def makeAssertExpr(value: Expr): Expr = {
+      def myAssert(value: => Value, @unused y: => Value): Either[String, Value] = value match {
+        case NumV(data) =>
+          if (data != 0)
+            Right(unitV)
+          else
+            Left(s"얘! 지금 네 눈에 $value 이게 truthy한 값이 되겠니??")
+        case _ => Left(s"얘! 지금 네 눈에 $value 이게 true/false가 되는 타입이 되겠니??")
+      }
+
+      BinaryOp(value, unitE, "assert", myAssert)
+    }
+
+    def access(container: => Value, idx: => Value): Either[String, Value] = container match {
       case VecV(data) => idx match {
         case NumV(n) =>
           if (n < 0 || n >= data.length)
@@ -294,10 +317,14 @@ package mte {
             Right(data(n.toInt))
         case _ => Left(s"얘! 지금 한줄서기 인덱스가 $idx 이게 숫자로 보이니??")
       }
-      case _ => Left(s"얘! 지금 한줄서기 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 한줄서기로 보이냐??")
+      case HMapV(data) => data.get(idx) match {
+        case Some(value) => Right(value)
+        case None => Left(s"얘! 뭉탱이($data)는 $idx 이런 거 몰라 임마!!")
+      }
+      case _ => Left(s"얘! 지금 한줄서기 인덱스 접근 문법(mte=$container, index=$idx)에서 $container 이게 컨테이너가 되겠니??")
     }
 
-    def makeVecAccessExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAccess", vecAccess)
+    def makeAccessExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "access", access)
 
     def vecAppend(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
       case VecV(lData) => Right(VecV(lData :+ rhs))
@@ -306,22 +333,31 @@ package mte {
 
     def makeVecAppendExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAppend", vecAppend)
 
-    def vecExtension(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
-      case VecV(lData) => rhs match {
-        case VecV(rData) => Right(VecV(lData ++ rData))
-        case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 한줄서기로 보이냐??")
+    def makeExtExpr(lhs: Expr, rhs: Expr): Expr = {
+      def extension(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
+        case VecV(lData) => rhs match {
+          case VecV(rData) => Right(VecV(lData ++ rData))
+          case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 한줄서기로 보이냐??")
+        }
+        case HMapV(lData) => rhs match {
+          case HMapV(rData) => Right(HMapV(lData ++ rData))
+          case _ => Left(s"얘! 지금 뭉탱이 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 뭉탱이로 보이냐??")
+        }
+        case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 컨테이너로 보이냐??")
       }
-      case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 한줄서기로 보이냐??")
+
+      BinaryOp(lhs, rhs, "ext", extension)
     }
 
-    def makeVecExtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecExt", vecExtension)
+    def makeSizeExpr(lhs: Expr, rhs: Expr): Expr = {
+      def containerSize(vec: => Value, @unused x: => Value): Either[String, Value] = vec match {
+        case VecV(data) => Right(NumV(data.length))
+        case HMapV(data) => Right(NumV(data.size))
+        case _ => Left(s"얘! 지금 $vec 이게 컨테이너로 보이냐??")
+      }
 
-    def vecSizeUnary(vec: => Value): Either[String, Value] = vec match {
-      case VecV(data) => Right(NumV(data.length))
-      case _ => Left(s"얘! 지금 $vec 이게 한줄서기로 보이냐??")
+      BinaryOp(lhs, rhs, "size", containerSize)
     }
-
-    val vecSize = unaryToBinary(vecSizeUnary)
 
     def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = {
       def vecFill(size: => Value, init: => Value): Either[String, Value] = size match {
@@ -339,7 +375,7 @@ package mte {
         case VecV(vec) => dropNum match {
           case NumV(num) =>
             if (vec.length < num) {
-              Left(s"얘! 지금 원소 ${vec.length}짜리 한줄서기에서 ${num}개짜리 원소를 떨어뜨리겠다는 게 말이 되니??")
+              Left(s"얘! 지금 원소 ${vec.length}짜리 한줄서기에서 ${num}개짜리 원소를 없애겠다는 게 말이 되니??")
             } else {
               Right(VecV(vec.dropRight(num.toInt)))
             }
@@ -516,7 +552,7 @@ package mte {
 
     @unused def 코가커요(rhs: Expr): Expr = ops.makeRemainderExpr(lhs, rhs)
 
-    @unused def 반제곱(@unused rhs: EndState4): Expr = ???
+    @unused def 반제곱(@unused rhs: EndState6): Expr = ops.makeSqrtExpr(lhs)
   }
 
   @unused
@@ -525,6 +561,9 @@ package mte {
 
   @unused
   val 게이조이고 = EndState4()
+
+  @unused
+  val 방어부스터 = EndState6()
 
   implicit class ExprOpsExtByExpr(lhs: Expr) extends ExprOps(lhs)
   implicit class ExprOpsExtByStr(lhs: String) extends ExprOps(Id(lhs))
@@ -536,6 +575,7 @@ package mte {
   case class EndState3() extends EndState
   case class EndState4() extends EndState
   case class EndState5() extends EndState
+  case class EndState6() extends EndState
 
 
   @unused val 뭉: Num = Num(1)
@@ -611,7 +651,7 @@ package mte {
     @unused
     def 화면을(rhs: RhsBuilder): Expr = ops.makeMulExpr(lhs, rhs.rhs)
   }
-  
+
   implicit class MulBuilderFromExpr(lhs: Expr) extends MulBuilder(lhs)
   implicit class MulBuilderFromId(id: String) extends MulBuilder(Id(id))
   implicit class MulBuilderFromInt(n: Int) extends MulBuilder(Num(n))
@@ -624,7 +664,7 @@ package mte {
     @unused
     @targetName("factFact")
     def !!(rhs: Expr): RhsBuilder = RhsBuilder(rhs)
-    
+
     case class RhsBuilder(rhs: Expr)
   }
 
@@ -875,11 +915,8 @@ package mte {
   @unused
   case object 정품 {
     @unused
-    def 맞어(expr: Expr): Expr = {
-      IfN0(expr, unitE, BuiltinFnE2E(utility.makeKillFn(
-        s"얘! $expr 이게 truthy 한 값이 되겠니??"
-      ), unitE, "kill"))
-    }
+    def 맞어(expr: Expr*): Expr =
+      sugarbuilder.vecToSeq(expr.map(ops.makeAssertExpr).toVector)
   }
 
   @unused
@@ -961,6 +998,12 @@ package mte {
     Vec(ret)
   }
 
+  /**
+   * 같은 원소가 여러 개 있는 벡터를 만들고 싶으면 왕한줄서기 문법을 사용하세요~
+   * @param size 벡터의 크기
+   * @param init 벡터의 초기치
+   * @return 벡터에 해당하는 표현식
+   */
   @unused
   def 왕한줄서기(size: Expr, init: Expr): Expr = ops.makeVecFillExpr(size, init)
 
@@ -972,31 +1015,50 @@ package mte {
      * @return 연결된 벡터를 나타내는 표현식
      */
     @unused
-    def 조이는(rhs: Expr): Expr = ops.makeVecExtExpr(lhs, rhs)
+    def 조이는(rhs: Expr): Expr = ops.makeExtExpr(lhs, rhs)
 
     /**
      * 문법: vec 즐기면서가자 fn
      * @param fn vec의 각 원소에 적용할 함수
-     * @return vector map을 나타내는 표현식
+     * @return container map을 나타내는 표현식
      */
     @unused
     def 즐기면서가자(fn: Expr): Expr = ???
 
     /**
+     * 문법: vec 특수한 fn
+     * @param fn 필터 함수
+     * @return container filter를 나타내는 표현식
+     */
+    @unused
+    def 특수한(fn: Expr): Expr = ???
+
+    /**
      * 문법: vec 씻구 fn
-     * @param fn
-     * @return
+     * @param fn 필터 함수
+     * @return container filter(reject)를 나타내는 표현식
      */
     @unused
     def 씻구(fn: Expr): Expr = ???
 
     import 임마.VecAccessRhsBuilder
 
+    /**
+     * 문법: (container) 갖고와 임마!! (idx)
+     * @param accIdxWrapper idx
+     * @return vector access expression
+     */
     @unused
-    def 갖고와(accIdxWrapper: VecAccessRhsBuilder): Expr = ops.makeVecAccessExpr(lhs, accIdxWrapper.accIdx)
+    def 갖고와(accIdxWrapper: VecAccessRhsBuilder): Expr = ops.makeAccessExpr(lhs, accIdxWrapper.accIdx)
 
     import 한판마안.VecUpdateRhsBuilder
 
+
+    /**
+     * 문법: (container) 갖고와 (idx) 할게 한판마안~~!! (val)
+     * @param idxE idx
+     * @return a fragment of vector update expression
+     */
     @unused
     def 갖고와(idxE: Expr): VecUpdateBuilder = VecUpdateBuilder(lhs, idxE)
 
@@ -1157,5 +1219,9 @@ package mte {
     final case class MteSyntaxErr(private val message: String = "",
                                   private val cause: Throwable = None.orNull)
       extends Exception(message, cause)
+  }
+
+  package stl {
+
   }
 }
