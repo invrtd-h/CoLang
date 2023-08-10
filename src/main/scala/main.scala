@@ -4,14 +4,6 @@ import scala.annotation.unused
 
 @main
 def main(): Unit = {
-  val x = Box2(Vector(TestV(1)), 0)
-  val y = x.copy()
-
-  x.set(TestV(2))
-
-  println(x)
-  println(y)
-
   구구단2()
   팩토리얼()
 

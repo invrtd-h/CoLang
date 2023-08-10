@@ -121,28 +121,12 @@ package mte {
   private case class ObjV(data: Map[String, Value],
                           supertype: TypeV) extends Value
 
-  private case class BoxV(addr: Addr) extends Value {
-    /**
-     * 자~ 가짜 주소를 만들었어요~
-     * 가짜 주소는 진짜 주소처럼 이렇게 잘 돼 있지 않아 딱 한줄서기 그런 게 아니고
-     * 동인천역 앞에 동인천역 앞에 쯥 그냥 뭉탱이로 있단 말이야
-     * @return 가짜 주소를 16진수로 변환한 문자열
-     */
-    override def toString: String = {
-      val newAddr = {
-        val newAddr = (utility.pow(913, addr + 20) * 998244353) >>> 12
-        newAddr - (newAddr % 8)
-      }
-      f"*[0x$newAddr%16x]"
-    }
-  }
-
   /**
    * 가비지 컬렉션이 더 잘 되는 새로운 박스를 준비했어요~~ 버그가 있는지 테스트 중이다 맨이야
    * @param data 데이터의 변경 과정을 기록해놓음
    * @param addr 현재 박스가 데이터의 총 변경 과정 중 몇 번째 원소에 해당하는 값을 갖고 있는지
    */
-  case class Box2(var data: Vector[Value], var addr: Addr) extends Value {
+  case class BoxV(var data: Vector[Value], var addr: Addr) extends Value {
     def get: Value = data(addr)
 
     def set(newData: Value): Unit = {
@@ -150,8 +134,8 @@ package mte {
       data = data.appended(newData)
     }
   }
-  
-  case class TestV(data: Int) extends Value
+
+  def makeNewBox(value: Value): BoxV = BoxV(Vector(value), 0)
 
   @unused
   case class Process(var pSto: Sto, private var nextAddr: Addr = 0) {
@@ -172,12 +156,7 @@ package mte {
     @unused
     @tailrec
     private def unbox(value: Value): Value = value match {
-      case BoxV(addr) => parentProcess.pSto.get(addr) match {
-        case Some(value) => unbox(value)
-        case None => throw error.MteRuntimeErr(
-          s"얘! 컴파일쟁이(${parentProcess.pSto})들은 $addr 이런 거 잘 몰라 임마!"
-        )
-      }
+      case box@BoxV(_, _) => unbox(box.get)
       case _ => value
     }
 
@@ -254,14 +233,12 @@ package mte {
           unitV
         case NewBox(initExpr) =>
           val initV: Value = pret(initExpr) |> unbox
-          val addr: Addr = parentProcess.giveNextAddr
-          parentProcess.pSto += (addr -> initV)
-          BoxV(addr)
+          makeNewBox(initV)
         case SetBox(ref, setExpr) =>
           val setVal = pret(setExpr) |> unbox
           pret(ref) match {
-            case BoxV(addr) =>
-              parentProcess.pSto += (addr -> setVal)
+            case box@BoxV(_, _) =>
+              box.set(setVal)
               setVal
             case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$pEnv, sto=${
