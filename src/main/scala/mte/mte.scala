@@ -1,6 +1,4 @@
 package mte {
-  import mte.확대하셨군요.RhsBuilder
-
   import scala.annotation.{tailrec, targetName, unused}
   import scala.language.implicitConversions
   import scala.util.Random
@@ -21,7 +19,11 @@ package mte {
 
   // Expressions
   @unused
-  case class Num(data: BigInt) extends Expr
+  case class Num(data: BigInt) extends Expr {
+    @unused
+    @targetName("plusPlus")
+    def ++(rhs: Num): Num = Num(data * 10 + rhs.data)
+  }
 
   case class UnitE() extends Expr {
     override def toString: String = "unit"
@@ -84,9 +86,40 @@ package mte {
     override def toString: String = s"CloV($argName, $fExpr)"
   }
 
-  private case class VecV(data: Vector[Value]) extends Value
+  private case class VecV(data: Vector[Value]) extends Value {
+    override def toString: String = data.toString()
+  }
 
-  private case class HMapV(data: Map[Value, Value]) extends Value
+  private case class HMapV(data: Map[Value, Value]) extends Value {
+    override def toString: String = data.toString()
+  }
+
+  private case class TypeV(memberName: Vector[String],
+                           methods: Map[String, Value],
+                           typeName: String) extends Value {
+    def makeMethodOf(obj: ObjV, methodName: String): Value = methods.get(methodName) match {
+      case Some(value) => value match {
+        case fn@CloV(_, _, _) =>
+          fn.fEnv += ("%reserved_self%" -> obj)
+          fn
+        case _ => throw error.MteRuntimeErr(
+          s"얘! 메소드 정의($value)가 틀려먹었단다! 고통스럽게 죽도록 해요~"
+        )
+      }
+      case None => throw error.MteRuntimeErr(
+        s"얘! 지금 클래스 ${typeName}의 인스턴스 ${obj}가 ${methodName}를 알겠니??"
+      )
+    }
+
+    def construct(memberValues: Vector[Value]): ObjV = if (memberName.length == memberValues.length) {
+      ObjV(memberName.zip(memberValues).toMap, supertype=this)
+    } else throw error.MteRuntimeErr(
+      s"얘! 지금 멤버 ${memberName.length}개짜리 코객체 만드는 데 값을 ${memberValues.length}개 줘서 되겠니??"
+    )
+  }
+
+  private case class ObjV(data: Map[String, Value],
+                          supertype: TypeV) extends Value
 
   private case class BoxV(addr: Addr) extends Value {
     /**
@@ -103,6 +136,22 @@ package mte {
       f"*[0x$newAddr%16x]"
     }
   }
+
+  /**
+   * 가비지 컬렉션이 더 잘 되는 새로운 박스를 준비했어요~~ 버그가 있는지 테스트 중이다 맨이야
+   * @param data 데이터의 변경 과정을 기록해놓음
+   * @param addr 현재 박스가 데이터의 총 변경 과정 중 몇 번째 원소에 해당하는 값을 갖고 있는지
+   */
+  case class Box2(var data: Vector[Value], var addr: Addr) extends Value {
+    def get: Value = data(addr)
+
+    def set(newData: Value): Unit = {
+      addr = data.length
+      data = data.appended(newData)
+    }
+  }
+  
+  case class TestV(data: Int) extends Value
 
   @unused
   case class Process(var pSto: Sto, private var nextAddr: Addr = 0) {
@@ -516,23 +565,6 @@ package mte {
   implicit def toId(name: String): Expr = Id(name)
   implicit def toNum(num: Int): Expr = Num(num)
 
-  implicit class NumExpansion(data: Num) {
-    @unused def 뭉: Num = Num(2 * data.data + 1)
-    @unused def 탱: Num = Num(2 * data.data)
-    @unused def 뭉뭉: Num = Num(4 * data.data + 3)
-    @unused def 뭉탱: Num = Num(4 * data.data + 2)
-    @unused def 탱뭉: Num = Num(4 * data.data + 1)
-    @unused def 탱탱: Num = Num(4 * data.data)
-    @unused def 뭉뭉뭉: Num = Num(8 * data.data + 7)
-    @unused def 뭉뭉탱: Num = Num(8 * data.data + 6)
-    @unused def 뭉탱뭉: Num = Num(8 * data.data + 5)
-    @unused def 뭉탱탱: Num = Num(8 * data.data + 4)
-    @unused def 탱뭉뭉: Num = Num(8 * data.data + 3)
-    @unused def 탱뭉탱: Num = Num(8 * data.data + 2)
-    @unused def 탱탱뭉: Num = Num(8 * data.data + 1)
-    @unused def 탱탱탱: Num = Num(8 * data.data)
-  }
-
   class ExprOps(lhs: Expr) {
     @unused def 배(rhs: Expr): Expr = ops.makeAddExpr(lhs, rhs)
 
@@ -586,9 +618,19 @@ package mte {
   @unused val 뭉뭉탱: Num = Num(6)
   @unused val 뭉탱뭉: Num = Num(5)
   @unused val 뭉탱탱: Num = Num(4)
+  @unused val 뭉뭉뭉뭉: Num = Num(15)
+  @unused val 뭉뭉뭉탱: Num = Num(14)
+  @unused val 뭉뭉탱뭉: Num = Num(13)
+  @unused val 뭉뭉탱탱: Num = Num(12)
+  @unused val 뭉탱뭉뭉: Num = Num(11)
+  @unused val 뭉탱뭉탱: Num = Num(10)
+  @unused val 뭉탱탱뭉: Num = Num(9)
+  @unused val 뭉탱탱탱: Num = Num(8)
 
   @unused val 스키비야: UnitE = unitE
   @unused val 스킵이야: UnitE = unitE
+
+  @unused val 나: Expr = Id("%reserved_self%")
 
   def makeNewProgram: Program = {
     val process: Process = Process(Map())
@@ -608,7 +650,6 @@ package mte {
 
     private def factHelper(expr: Vector[Expr]): ProgramBuilder = {
       val sequencedExpr = sugarbuilder.vecToSeq(expr)
-      println(sequencedExpr)
       val result: Value = program.mainFn.pret(sequencedExpr)
       this
     }
