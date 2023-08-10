@@ -62,6 +62,8 @@ package mte {
 
   private case class SetBox(box: Expr, setExpr: Expr) extends Expr
 
+  private case class Lazy(lazyExpr: Expr) extends Expr
+
   private case class Vec(data: Vector[Expr]) extends Expr
 
   private case class HMap(data: Map[Expr, Expr]) extends Expr
@@ -135,23 +137,11 @@ package mte {
     }
   }
 
+  case class LazyV(expr: Expr, env: Env, var memo: Option[Value]) extends Value
+
   def makeNewBox(value: Value): BoxV = BoxV(Vector(value), 0)
 
-  @unused
-  case class Process(var pSto: Sto, private var nextAddr: Addr = 0) {
-    @unused
-    def pret(expr: Expr): Value = {
-      val func = ProcessFn(this, Map())
-      func.pret(expr)
-    }
-
-    def giveNextAddr: Addr = {
-      nextAddr += 1
-      nextAddr
-    }
-  }
-
-  case class ProcessFn(parentProcess: Process, var pEnv: Env) {
+  case class Process(var pEnv: Env) {
 
     @unused
     @tailrec
@@ -160,10 +150,29 @@ package mte {
       case _ => value
     }
 
+    @tailrec
+    private def force(value: Value): Value = value match {
+      case lazyVal@LazyV(expr, env, memo) => memo match
+        case Some(value) => force(value)
+        case None =>
+          val newFn: Process = Process(env)
+          val value: Value = newFn.pret(expr)
+          lazyVal.memo = Some(value)
+          force(value)
+      case _ => value
+    }
+
+    @tailrec
+    private def decay(value: Value): Value = value match {
+      case box@BoxV(_, _) => decay(box.get)
+      case lazyVal@LazyV(_, _, _) => force(lazyVal)
+      case _ => value
+    }
+
     private def fnCall(fnExpr: Expr, argExpr: Expr): Value = pret(fnExpr) match {
       case CloV(argName, fExpr, fEnv) =>
         val argV: Value = pret(argExpr)
-        val newFn: ProcessFn = ProcessFn(parentProcess, fEnv + (argName -> argV))
+        val newFn: Process = Process(fEnv + (argName -> argV))
         newFn.pret(fExpr)
       case err@_ => throw error.MteRuntimeErr(
         s"얘! 지금 $err 이게 함수로 보이니?"
@@ -174,11 +183,11 @@ package mte {
       expr match {
         case Num(data) => NumV(data)
         case UnitE() => unitV
-        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> unbox, pret(rhs) |> unbox) match {
+        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> decay, pret(rhs) |> decay) match {
           case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
           case Right(value) => value
         }
-        case TernaryOp(x, y, z, op, _) => op(pret(x) |> unbox, pret(y) |> unbox, pret(z) |> unbox) match {
+        case TernaryOp(x, y, z, op, _) => op(pret(x) |> decay, pret(y) |> decay, pret(z) |> decay) match {
           case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
           case Right(value) => value
         }
@@ -206,7 +215,7 @@ package mte {
         case Seq(lhs, rhs) =>
           pret(lhs); pret(rhs)
         case IfN0(cond, exprTrue, exprFalse) =>
-          pret(cond) |> unbox match {
+          pret(cond) |> decay match {
             case NumV(data) =>
               if (data != 0)
                 fnCall(sugarbuilder.exprToFn(exprTrue), unitE)
@@ -218,7 +227,7 @@ package mte {
           }
         case WhileN0(cond, exprIn) =>
           val check = (condExpr: Expr) => {
-            pret(condExpr) |> unbox match {
+            pret(condExpr) |> decay match {
               case NumV(data) => data
               case err@_ => throw error.MteRuntimeErr(
                 s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
@@ -241,11 +250,10 @@ package mte {
               box.set(setVal)
               setVal
             case err@_ => throw error.MteRuntimeErr(
-              s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$pEnv, sto=${
-                parentProcess.pSto.toVector.sortBy((addr: Addr, _) => addr)
-              }"
+              s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$pEnv"
             )
           }
+        case Lazy(lazyExpr) => LazyV(lazyExpr, pEnv, None)
         case Vec(data) => VecV(data.map(pret))
         case HMap(data) => HMapV(data.map((key, value) => (pret(key), pret(value))))
         case Try(exprTry) =>
@@ -266,7 +274,7 @@ package mte {
   package ops {
     import java.lang.Package
 
-    def liftBinaryOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Either[String, Value] = {
+    private def liftBinaryOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Either[String, Value] = {
       def ret(lhs: => Value, rhs: => Value): Either[String, Value] = {
         lhs match {
           case NumV(dataL) => rhs match {
@@ -280,7 +288,7 @@ package mte {
       ret
     }
 
-    def liftUnaryOp(op: BigInt => BigInt): (=> Value, => Value) => Either[String, Value] = {
+    private def liftUnaryOp(op: BigInt => BigInt): (=> Value, => Value) => Either[String, Value] = {
       def ret(lhs: => Value, @unused rhs: => Value): Either[String, Value] = lhs match {
         case NumV(data) => Right(NumV(op(data)))
         case _ => Left(s"얘! 여기 지금 $lhs 이게 숫자로 보이니??")
@@ -289,19 +297,14 @@ package mte {
       ret
     }
 
-    val valSub = liftBinaryOp(_ - _)
-    val valMul = liftBinaryOp(_ * _)
-    val valDiv = liftBinaryOp(_ / _)
-    val valRemainder = liftBinaryOp(_ % _)
-
     def makeAddExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "add", liftBinaryOp(_ + _))
-    def makeSubExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "sub", valSub)
-    def makeMulExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "mul", valMul)
-    def makeDivExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "div", valDiv)
+    def makeSubExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "sub", liftBinaryOp(_ - _))
+    def makeMulExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "mul", liftBinaryOp(_ * _))
+    def makeDivExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "div", liftBinaryOp(_ / _))
     def makeGtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "gt", liftBinaryOp(utility.gtInt))
     def makeGeExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "ge", liftBinaryOp(utility.geInt))
     def makeLogNotExpr(lhs: Expr): Expr = BinaryOp(lhs, unitE, "logNot", liftUnaryOp(utility.logNot))
-    def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "%", valRemainder)
+    def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "%", liftBinaryOp(_ % _))
 
     def makeSqrtExpr(lhs: Expr): Expr = {
       def sqrt(value: => Value, @unused x: => Value): Either[String, Value] = value match {
@@ -334,23 +337,25 @@ package mte {
       BinaryOp(value, unitE, "assert", myAssert)
     }
 
-    def access(container: => Value, idx: => Value): Either[String, Value] = container match {
-      case VecV(data) => idx match {
-        case NumV(n) =>
-          if (n < 0 || n >= data.length)
-            Left(s"얘! 지금 idx=$n 이게 길이 ${data.length}짜리 한줄서기에 접근이 되겠니??")
-          else
-            Right(data(n.toInt))
-        case _ => Left(s"얘! 지금 한줄서기 인덱스가 $idx 이게 숫자로 보이니??")
+    def makeAccessExpr(lhs: Expr, rhs: Expr): Expr = {
+      def access(container: => Value, idx: => Value): Either[String, Value] = container match {
+        case VecV(data) => idx match {
+          case NumV(n) =>
+            if (n < 0 || n >= data.length)
+              Left(s"얘! 지금 idx=$n 이게 길이 ${data.length}짜리 한줄서기에 접근이 되겠니??")
+            else
+              Right(data(n.toInt))
+          case _ => Left(s"얘! 지금 한줄서기 인덱스가 $idx 이게 숫자로 보이니??")
+        }
+        case HMapV(data) => data.get(idx) match {
+          case Some(value) => Right(value)
+          case None => Left(s"얘! 뭉탱이($data)는 $idx 이런 거 몰라 임마!!")
+        }
+        case _ => Left(s"얘! 지금 인덱스 접근 문법(mte=$container, index=$idx)에서 $container 이게 컨테이너가 되겠니??")
       }
-      case HMapV(data) => data.get(idx) match {
-        case Some(value) => Right(value)
-        case None => Left(s"얘! 뭉탱이($data)는 $idx 이런 거 몰라 임마!!")
-      }
-      case _ => Left(s"얘! 지금 한줄서기 인덱스 접근 문법(mte=$container, index=$idx)에서 $container 이게 컨테이너가 되겠니??")
-    }
 
-    def makeAccessExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "access", access)
+      BinaryOp(lhs, rhs, "access", access)
+    }
 
     def vecAppend(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
       case VecV(lData) => Right(VecV(lData :+ rhs))
@@ -609,15 +614,9 @@ package mte {
 
   @unused val 나: Expr = Id("%reserved_self%")
 
-  def makeNewProgram: Program = {
-    val process: Process = Process(Map())
-    val program: Program = Program(process, ProcessFn(process, Map()))
-    program
-  }
+  def 춘잣: ProgramBuilder = ProgramBuilder(Process(Map()))
 
-  def 춘잣: ProgramBuilder = ProgramBuilder(makeNewProgram)
-
-  case class ProgramBuilder(program: Program) {
+  case class ProgramBuilder(process: Process) {
     @targetName("fact")
     @unused
     def ! (expr: Expr*) : ProgramBuilder = factHelper(expr.toVector)
@@ -627,11 +626,10 @@ package mte {
 
     private def factHelper(expr: Vector[Expr]): ProgramBuilder = {
       val sequencedExpr = sugarbuilder.vecToSeq(expr)
-      val result: Value = program.mainFn.pret(sequencedExpr)
+      val result: Value = process.pret(sequencedExpr)
       this
     }
   }
-  case class Program(process: Process, mainFn: ProcessFn)
 
   @unused
   @targetName("notFact")
@@ -793,7 +791,15 @@ package mte {
     def 은(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
 
     @unused
+    def 은(fnExprs: Vector[Expr]): MultiLambdaBuilder2 =
+      MultiLambdaBuilder2(argIds, sugarbuilder.vecToSeq(fnExprs))
+
+    @unused
     def 는(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
+
+    @unused
+    def 는(fnExprs: Vector[Expr]): MultiLambdaBuilder2 =
+      MultiLambdaBuilder2(argIds, sugarbuilder.vecToSeq(fnExprs))
 
     class MultiLambdaBuilder2(argIds: Vector[String], fnExpr: Expr) {
       @unused
@@ -1114,6 +1120,9 @@ package mte {
   implicit class VecOpsBuilderFromExpr(lhs: Expr) extends VecOpsBuilder(lhs)
   implicit class VecOpsBuilderFromId(id: String) extends VecOpsBuilder(Id(id))
   implicit class VecOpsBuilderFromInt(num: Int) extends VecOpsBuilder(Num(num))
+
+  @unused
+  def 언젠가(expr: Expr): Expr = Lazy(expr)
 
   /**
    * 랜덤이 필요하면 윷놀이 를! 아침까지 조이도록 해요~
