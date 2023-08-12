@@ -11,7 +11,18 @@ package mte {
     def +(rhs: Expr): Expr = ops.makeAddExpr(this, rhs)
   }
 
-  sealed trait Value
+  sealed trait Value {
+    def isTruthy: Boolean = mte.isTruthy(this) match
+      case Some(value) => value
+      case None => throw error.MteRuntimeErr(
+        s"얘! 지금 네 눈에 $this 이게 boolean 취급할 수 있는 값처럼 보이니?? 죽여벌랑"
+      )
+  }
+
+  private def isTruthy(value: Value): Option[Boolean] = value match {
+    case NumV(data) => if (data != 0) Some(true) else Some(false)
+    case _ => None
+  }
 
   type Env = Map[String, Value]
   type Addr = Int
@@ -58,11 +69,9 @@ package mte {
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
-  private case class NewBox(initExpr: Expr) extends Expr
+  private case class DefBox(id: String, initExpr: Expr) extends Expr
 
   private case class SetBox(box: Expr, setExpr: Expr) extends Expr
-
-  private case class Lazy(lazyExpr: Expr) extends Expr
 
   private case class Vec(data: Vector[Expr]) extends Expr
 
@@ -86,6 +95,8 @@ package mte {
 
   private case class CloV(argName: String, fExpr: Expr, var fEnv: Env) extends Value {
     override def toString: String = s"CloV($argName, $fExpr)"
+
+    def call(arg: Value): Value = interpret(fExpr, fEnv + (argName -> arg))
   }
 
   private case class VecV(data: Vector[Value]) extends Value {
@@ -137,8 +148,6 @@ package mte {
     }
   }
 
-  case class LazyV(expr: Expr, env: Env, var memo: Option[Value]) extends Value
-
   def makeNewBox(value: Value): BoxV = BoxV(Vector(value), 0)
 
   case class Process(var pEnv: Env) {
@@ -150,44 +159,30 @@ package mte {
       case _ => value
     }
 
-    @tailrec
-    private def force(value: Value): Value = value match {
-      case lazyVal@LazyV(expr, env, memo) => memo match
-        case Some(value) => force(value)
-        case None =>
-          val newFn: Process = Process(env)
-          val value: Value = newFn.pret(expr)
-          lazyVal.memo = Some(value)
-          force(value)
-      case _ => value
-    }
-
-    @tailrec
-    private def decay(value: Value): Value = value match {
-      case box@BoxV(_, _) => decay(box.get)
-      case lazyVal@LazyV(_, _, _) => force(lazyVal)
-      case _ => value
-    }
-
     private def fnCall(fnExpr: Expr, argExpr: Expr): Value = pret(fnExpr) match {
       case CloV(argName, fExpr, fEnv) =>
         val argV: Value = pret(argExpr)
-        val newFn: Process = Process(fEnv + (argName -> argV))
-        newFn.pret(fExpr)
+        interpret(fExpr, fEnv + (argName -> argV))
       case err@_ => throw error.MteRuntimeErr(
         s"얘! 지금 $err 이게 함수로 보이니?"
       )
+    }
+
+    private def validateID(id: String): Unit = {
+      if (id.contains("킹") && id.contains("갓")) {
+        throw error.MteRuntimeErr("내가 킹하고 갓하고 함부로 막 붙이지 말라 그랬지!!")
+      }
     }
 
     def pret(expr: Expr): Value = {
       expr match {
         case Num(data) => NumV(data)
         case UnitE() => unitV
-        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> decay, pret(rhs) |> decay) match {
+        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> unbox, pret(rhs) |> unbox) match {
           case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
           case Right(value) => value
         }
-        case TernaryOp(x, y, z, op, _) => op(pret(x) |> decay, pret(y) |> decay, pret(z) |> decay) match {
+        case TernaryOp(x, y, z, op, _) => op(pret(x) |> unbox, pret(y) |> unbox, pret(z) |> unbox) match {
           case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
           case Right(value) => value
         }
@@ -201,10 +196,8 @@ package mte {
           )
         }
         case ValDef(valName, initExpr) =>
-          if (valName.contains("킹") && valName.contains("갓")) {
-            throw error.MteRuntimeErr("내가 킹하고 갓하고 함부로 막 붙이지 말라 그랬지!!")
-          }
-          val initV: Value = pret(initExpr)
+          validateID(valName)
+          val initV: Value = pret(initExpr) |> unbox
           pEnv += (valName -> initV)
           initV
         case Fun(funName, argName, fExpr) =>
@@ -215,7 +208,7 @@ package mte {
         case Seq(lhs, rhs) =>
           pret(lhs); pret(rhs)
         case IfN0(cond, exprTrue, exprFalse) =>
-          pret(cond) |> decay match {
+          pret(cond) |> unbox match {
             case NumV(data) =>
               if (data != 0)
                 fnCall(sugarbuilder.exprToFn(exprTrue), unitE)
@@ -227,7 +220,7 @@ package mte {
           }
         case WhileN0(cond, exprIn) =>
           val check = (condExpr: Expr) => {
-            pret(condExpr) |> decay match {
+            pret(condExpr) |> unbox match {
               case NumV(data) => data
               case err@_ => throw error.MteRuntimeErr(
                 s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
@@ -240,9 +233,11 @@ package mte {
             condVal = check(cond)
           }
           unitV
-        case NewBox(initExpr) =>
+        case DefBox(id, initExpr) =>
+          validateID(id)
           val initV: Value = pret(initExpr) |> unbox
-          makeNewBox(initV)
+          pEnv += (id -> makeNewBox(initV))
+          initV
         case SetBox(ref, setExpr) =>
           val setVal = pret(setExpr) |> unbox
           pret(ref) match {
@@ -253,7 +248,6 @@ package mte {
               s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$pEnv"
             )
           }
-        case Lazy(lazyExpr) => LazyV(lazyExpr, pEnv, None)
         case Vec(data) => VecV(data.map(pret))
         case HMap(data) => HMapV(data.map((key, value) => (pret(key), pret(value))))
         case Try(exprTry) =>
@@ -267,6 +261,8 @@ package mte {
       }
     }
   }
+
+  private def interpret(expr: Expr, env: Env): Value = Process(env).pret(expr)
 
   val unitE: UnitE = UnitE()
   val unitV: UnitV = UnitV()
@@ -357,6 +353,31 @@ package mte {
       BinaryOp(lhs, rhs, "access", access)
     }
 
+    def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = {
+      def vecFill(size: => Value, init: => Value): Either[String, Value] = size match {
+        case NumV(data) => Right(VecV(Vector.fill(data.toInt) {
+          init
+        }))
+        case _ => Left(s"얘! 지금 나보고 ${size}개의 원소를 가진 벡터를 만들어 달라고 하면 어쩌자는 거니!")
+      }
+
+      BinaryOp(sizeE, initE, "vecFill", vecFill)
+    }
+
+    def makeVecIotaExpr(lbdInclusive: Expr, ubdExclusive: Expr): Expr = {
+      def vecIota(lbdInclusive: => Value, ubdExclusive: => Value): Either[String, Value] = {
+        lbdInclusive match {
+          case NumV(l) => ubdExclusive match {
+            case NumV(u) => Right(VecV((l.toInt to u.toInt).map(value => NumV(value)).toVector))
+            case _ => Left(s"얘! 지금 $ubdExclusive 이게 숫자로 보이니??")
+          }
+          case _ => Left(s"얘! 지금 $lbdInclusive 이게 숫자로 보이니??")
+        }
+      }
+
+      BinaryOp(lbdInclusive, ubdExclusive, "vecIota", vecIota)
+    }
+
     def vecAppend(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
       case VecV(lData) => Right(VecV(lData :+ rhs))
       case _ => Left(s"얘! 지금 한줄서기 원소 추가 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 여기다 뭘 넣겠다는 거니??")
@@ -390,17 +411,6 @@ package mte {
       BinaryOp(lhs, rhs, "size", containerSize)
     }
 
-    def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = {
-      def vecFill(size: => Value, init: => Value): Either[String, Value] = size match {
-        case NumV(data) => Right(VecV(Vector.fill(data.toInt) {
-          init
-        }))
-        case _ => Left(s"얘! 지금 나보고 ${size}개의 원소를 가진 벡터를 만들어 달라고 하면 어쩌자는 거니!")
-      }
-
-      BinaryOp(sizeE, initE, "vecFill", vecFill)
-    }
-
     def makeVecDropRightExpr(vecE: Expr, dropNumE: Expr): Expr = {
       def vecDropRight(vec: => Value, dropNum: => Value): Either[String, Value] = vec match {
         case VecV(vec) => dropNum match {
@@ -417,13 +427,48 @@ package mte {
 
       BinaryOp(vecE, dropNumE, "vecDropRight", vecDropRight)
     }
+
+    def makeVecFilterExpr(vec: Expr, fn: Expr): Expr = {
+      def vecFilter(vec: => Value, fn: => Value): Either[String, Value] = vec match {
+        case VecV(vec) => fn match {
+          case fnV@CloV(_, _, _) => Right(VecV(vec.filter(value => fnV.call(value).isTruthy)))
+          case _ => Left(s"얘! 지금 $fn 이게 함수로 보이니??")
+        }
+        case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
+      }
+
+      BinaryOp(vec, fn, "vecFilter", vecFilter)
+    }
+
+    def makeVecRejectExpr(vec: Expr, fn: Expr): Expr = {
+      def vecReject(vec: => Value, fn: => Value): Either[String, Value] = vec match {
+        case VecV(vec) => fn match {
+          case fnV@CloV(_, _, _) => Right(VecV(vec.filterNot(value => fnV.call(value).isTruthy)))
+          case _ => Left(s"얘! 지금 $fn 이게 함수로 보이니??")
+        }
+        case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
+      }
+
+      BinaryOp(vec, fn, "vecReject", vecReject)
+    }
+
+    def makeVecMapExpr(vec: Expr, fn: Expr): Expr = {
+      def vecMap(vec: => Value, fn: => Value): Either[String, Value] = vec match {
+        case VecV(vec) => fn match {
+          case fnV@CloV(_, _, _) => Right(VecV(vec.map(fnV.call)))
+          case _ => Left(s"얘! 지금 $fn 이게 함수로 보이니??")
+        }
+        case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
+      }
+
+      BinaryOp(vec, fn, "vecMap", vecMap)
+    }
   }
 
   package ops3 {
-    def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] = cond match {
-      case NumV(data) => if (data != 0) Right(yes) else Right(no)
-      case _ => Left(s"얘! 지금 네 눈에 $cond 이게 boolean 취급할 수 있는 값처럼 보이니?? 죽여벌랑")
-    }
+    def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] =
+      if (cond.isTruthy) Right(yes) else Right(no)
+
     def makeVecUpdatedExpr(vecE: Expr, idxE: Expr, dataE: Expr): Expr = {
       def vecUpdated(vec: => Value, idx: => Value, data: => Value): Either[String, Value] = vec match {
         case VecV(vec) => idx match {
@@ -483,7 +528,7 @@ package mte {
     def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
       newScope(
         Seq(
-          ValDef(iterName, initExpr),
+          DefBox(iterName, initExpr),
           WhileN0(condExpr, Seq(
             inExpr,
             manipulationExpr
@@ -494,7 +539,7 @@ package mte {
 
     def newSimpleFor(iterName: String, lbdInclusive: Expr, ubdExclusive: Expr, inExpr: Expr): Expr = newFor(
       iterName = iterName,
-      initExpr = NewBox(lbdInclusive),
+      initExpr = lbdInclusive,
       condExpr = ops.makeGtExpr(ubdExclusive, Id(iterName)),
       manipulationExpr = SetBox(Id(iterName), Id(iterName) + 1),
       inExpr = inExpr
@@ -569,16 +614,6 @@ package mte {
     @unused def 반제곱(@unused rhs: EndState6): Expr = ops.makeSqrtExpr(lhs)
   }
 
-  @unused
-  @targetName("bitNotBitNot")
-  val ~~ = EndState3()
-
-  @unused
-  val 게이조이고 = EndState4()
-
-  @unused
-  val 방어부스터 = EndState6()
-
   implicit class ExprOpsExtByExpr(lhs: Expr) extends ExprOps(lhs)
   implicit class ExprOpsExtByStr(lhs: String) extends ExprOps(Id(lhs))
   implicit class ExprOpsExtByNum(lhs: Int) extends ExprOps(Num(lhs))
@@ -590,6 +625,7 @@ package mte {
   case class EndState4() extends EndState
   case class EndState5() extends EndState
   case class EndState6() extends EndState
+  case class EndState7() extends EndState
 
 
   @unused val 뭉: Num = Num(1)
@@ -643,13 +679,15 @@ package mte {
   @targetName("eqQuesQues")
   val =?? = EndState5()
 
-  // 를! "x"
   @unused
-  case object 를 {
-    @targetName("fact")
-    @unused
-    def !(valName: String): Expr = Id(valName)
-  }
+  @targetName("bitNotBitNot")
+  val ~~ = EndState3()
+
+  @unused
+  val 게이조이고 = EndState4()
+
+  @unused
+  val 방어부스터 = EndState6()
 
   /**
    * 곱셈 연산이다 맨이야.
@@ -736,6 +774,17 @@ package mte {
       @unused
       def 을(@unused h: 했대.type): Expr =
         ValDef(name, expr)
+
+      @unused
+      def 발행(@unused x: NFT.type): DefBoxBuilder = DefBoxBuilder(name, expr)
+
+      case class DefBoxBuilder(name: String, expr: Expr) {
+        @unused
+        def 를(@unused h: 했대.type): Expr = DefBox(name, expr)
+
+        @unused
+        def 을(@unused h: 했대.type): Expr = DefBox(name, expr)
+      }
     }
   }
 
@@ -943,19 +992,6 @@ package mte {
       sugarbuilder.vecToSeq(expr.map(ops.makeAssertExpr).toVector)
   }
 
-  @unused
-  case class BoxBuilder(expr: Expr) {
-    @unused
-    def 발행(@unused nft: NFT.type): Expr = NewBox(expr)
-
-    @unused
-    @targetName("rrArrow")
-    def -->(@unused nft: NFT.type): Expr = NewBox(expr)
-  }
-
-  implicit class BoxBuilderFromExpr(expr: Expr) extends BoxBuilder(expr)
-  implicit class BoxBuilderFromID(name: String) extends BoxBuilder(Id(name))
-  implicit class BoxBuilderFromNumber(num: Int) extends BoxBuilder(Num(num))
 
   case object NFT
 
@@ -1031,6 +1067,20 @@ package mte {
   @unused
   def 왕한줄서기(size: Expr, init: Expr): Expr = ops.makeVecFillExpr(size, init)
 
+  @unused
+  case object 뭐 {
+    @unused def 드시냐고(ubdExclusive: Expr): IotaBuilder = IotaBuilder(0, ubdExclusive)
+
+    @unused def 드시냐고(lbdInclusive: Expr, ubdExclusive: Expr): IotaBuilder =
+      IotaBuilder(lbdInclusive, ubdExclusive)
+
+    case class IotaBuilder(lbdInclusive: Expr, ubdExclusive: Expr) {
+      @unused
+      def 번째(@unused x: 물어봅니다.type): Expr = ops.makeVecIotaExpr(lbdInclusive, ubdExclusive)
+    }
+  }
+
+  case object 물어봅니다
 
   case class VecOpsBuilder(lhs: Expr) {
     /**
@@ -1047,7 +1097,7 @@ package mte {
      * @return container map을 나타내는 표현식
      */
     @unused
-    def 즐기면서가자(fn: Expr): Expr = ???
+    def 즐기면서가자(fn: Expr): Expr = ops.makeVecMapExpr(lhs, fn)
 
     /**
      * 문법: vec 특수한 fn
@@ -1055,7 +1105,7 @@ package mte {
      * @return container filter를 나타내는 표현식
      */
     @unused
-    def 특수한(fn: Expr): Expr = ???
+    def 특수한(fn: Expr): Expr = ops.makeVecFilterExpr(lhs, fn)
 
     /**
      * 문법: vec 씻구 fn
@@ -1063,7 +1113,7 @@ package mte {
      * @return container filter(reject)를 나타내는 표현식
      */
     @unused
-    def 씻구(fn: Expr): Expr = ???
+    def 씻구(fn: Expr): Expr = ops.makeVecRejectExpr(lhs, fn)
 
     import 임마.VecAccessRhsBuilder
 
@@ -1120,9 +1170,6 @@ package mte {
   implicit class VecOpsBuilderFromExpr(lhs: Expr) extends VecOpsBuilder(lhs)
   implicit class VecOpsBuilderFromId(id: String) extends VecOpsBuilder(Id(id))
   implicit class VecOpsBuilderFromInt(num: Int) extends VecOpsBuilder(Num(num))
-
-  @unused
-  def 언젠가(expr: Expr): Expr = Lazy(expr)
 
   /**
    * 랜덤이 필요하면 윷놀이 를! 아침까지 조이도록 해요~
@@ -1210,27 +1257,6 @@ package mte {
 
     def maxInt(lhs: BigInt, rhs: BigInt): BigInt =
       if (lhs > rhs) lhs else rhs
-
-    def makeKillFn(msg: String): Expr => Expr = {
-      def ret(unitE: Expr): Expr = {
-        assert(false, msg)
-        unitE
-      }
-
-      ret
-    }
-
-    def pow(x: Long, power: Long): Long = {
-      var x_ = x
-      var pw = power
-      var ret = x_
-      while (pw > 0) {
-        if (pw % 2 == 1) ret = ret * x_
-        x_ = x_ * x_
-        pw /= 2
-      }
-      ret
-    }
   }
 
   package error {
