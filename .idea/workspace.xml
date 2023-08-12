@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="반제곱 방어부스터 연산자 추가, 정품 맞어 연산자 variadic으로 변경">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="정의문에서 box decay 안 되는 버그 수정하기 전 푸시">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
@@ -24,6 +24,11 @@
     </projectState>
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="master" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="MarkdownSettingsMigration">
@@ -108,7 +113,7 @@
       <workItem from="1690942285200" duration="17000" />
       <workItem from="1690942305433" duration="184000" />
       <workItem from="1690950484864" duration="2883000" />
-      <workItem from="1691389465635" duration="26077000" />
+      <workItem from="1691389465635" duration="40241000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -320,7 +325,28 @@
       <option name="project" value="LOCAL" />
       <updated>1691570802663</updated>
     </task>
-    <option name="localTasksCounter" value="31" />
+    <task id="LOCAL-00031" summary="반제곱 방어부스터 연산자 추가, 정품 맞어 연산자 variadic으로 변경">
+      <created>1691644739140</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1691644739140</updated>
+    </task>
+    <task id="LOCAL-00032" summary="first commit on this branch">
+      <created>1691645656944</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1691645656944</updated>
+    </task>
+    <task id="LOCAL-00033" summary="정의문에서 box decay 안 되는 버그 수정하기 전 푸시">
+      <created>1691655535706</created>
+      <option name="number" value="00033" />
+      <option name="presentableId" value="LOCAL-00033" />
+      <option name="project" value="LOCAL" />
+      <updated>1691655535706</updated>
+    </task>
+    <option name="localTasksCounter" value="34" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -355,7 +381,9 @@
     <MESSAGE value="묶음!! 키워드를 변수 정의에도 쓸 수 있음" />
     <MESSAGE value="화면을 확대하셨군요!! 연산자 추가" />
     <MESSAGE value="반제곱 방어부스터 연산자 추가, 정품 맞어 연산자 variadic으로 변경" />
-    <option name="LAST_COMMIT_MESSAGE" value="반제곱 방어부스터 연산자 추가, 정품 맞어 연산자 variadic으로 변경" />
+    <MESSAGE value="first commit on this branch" />
+    <MESSAGE value="정의문에서 box decay 안 되는 버그 수정하기 전 푸시" />
+    <option name="LAST_COMMIT_MESSAGE" value="정의문에서 box decay 안 되는 버그 수정하기 전 푸시" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
