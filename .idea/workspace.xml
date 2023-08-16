@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="CoLang 로고 업로드">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="객체 지향 구현 중 (multivariable fn을 처음부터 리팩토링하기 전에 한 번 푸시)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
@@ -119,7 +119,7 @@
       <workItem from="1690942305433" duration="184000" />
       <workItem from="1690950484864" duration="2883000" />
       <workItem from="1691389465635" duration="48102000" />
-      <workItem from="1692065461486" duration="21566000" />
+      <workItem from="1692065461486" duration="27169000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -373,7 +373,14 @@
       <option name="project" value="LOCAL" />
       <updated>1691818885299</updated>
     </task>
-    <option name="localTasksCounter" value="37" />
+    <task id="LOCAL-00037" summary="객체 지향 구현 중 (multivariable fn을 처음부터 리팩토링하기 전에 한 번 푸시)">
+      <created>1692102766556</created>
+      <option name="number" value="00037" />
+      <option name="presentableId" value="LOCAL-00037" />
+      <option name="project" value="LOCAL" />
+      <updated>1692102766556</updated>
+    </task>
+    <option name="localTasksCounter" value="38" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -411,7 +418,8 @@
     <MESSAGE value="first commit on this branch" />
     <MESSAGE value="정의문에서 box decay 안 되는 버그 수정하기 전 푸시" />
     <MESSAGE value="CoLang 로고 업로드" />
-    <option name="LAST_COMMIT_MESSAGE" value="CoLang 로고 업로드" />
+    <MESSAGE value="객체 지향 구현 중 (multivariable fn을 처음부터 리팩토링하기 전에 한 번 푸시)" />
+    <option name="LAST_COMMIT_MESSAGE" value="객체 지향 구현 중 (multivariable fn을 처음부터 리팩토링하기 전에 한 번 푸시)" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
