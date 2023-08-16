@@ -30,6 +30,10 @@ package mte {
   private case object AnonFn1 extends VarID
   private case object AnonArg1 extends VarID
 
+  case class VarIDImplicit(id: VarID)
+  implicit class VarIDImplicitFromVarID(id: VarID) extends VarIDImplicit(id)
+  implicit class VarIDImplicitFromStr(id: String) extends VarIDImplicit(StringID(id))
+
   type Env = Map[VarID, Value]
   type Addr = Int
 
@@ -68,17 +72,15 @@ package mte {
 
   private case class ValDef(valName: StringID, initExpr: Expr) extends Expr
 
-  private case class Fun(funName: VarID, argName: VarID, fExpr: Expr) extends Expr
+  private case class Fun(funName: VarID, argName: Vector[VarID], fExpr: Expr) extends Expr
 
-  private case class App(fnExpr: Expr, argExpr: Expr) extends Expr
+  private case class App(fnExpr: Expr, argExpr: Vector[Expr]) extends Expr
 
   private case class Seq(lhs: Expr, rhs: Expr) extends Expr
 
   private case class IfN0(cond: Expr, exprTrue: Expr, exprFalse: Expr) extends Expr
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
-
-  case class Construct(typeName: StringID, args: Vector[Expr]) extends Expr
 
   private case class Proj(obj: Expr, id: VarID) extends Expr
 
@@ -110,10 +112,17 @@ package mte {
     override def toString: String = "%s".format(data)
   }
 
-  private case class CloV(argName: VarID, fExpr: Expr, var fEnv: Env) extends Value {
+  private case class CloV(argName: Vector[VarID], fExpr: Expr, var fEnv: Env) extends Value {
     override def toString: String = s"CloV($argName, $fExpr)"
 
-    def call(arg: Value): Value = interpret(fExpr, fEnv + (argName -> arg))
+    def call(arg: Vector[Value]): Value = {
+      if (argName.length != arg.length) {
+        throw error.MteSyntaxErr(
+          s"얘! 지금 돈 ${arg.length} 원에 함수 ${this}를 불러달라고 한 거니?? 단가가 안 맞잖아 임마!!"
+        )
+      }
+      interpret(fExpr, fEnv ++ argName.zip(arg).toMap)
+    }
   }
 
   private case class VecV(data: Vector[Value]) extends Value {
@@ -131,6 +140,7 @@ package mte {
       case Some(value) => value match {
         case fn@CloV(_, _, _) =>
           fn.fEnv += (ThisKW -> obj)
+          fn.fEnv += (typeName -> this)
           fn
         case _ => throw error.MteRuntimeErr(
           s"얘! 메소드 정의($value)가 틀려먹었단다! 고통스럽게 죽도록 해요~"
@@ -146,6 +156,8 @@ package mte {
     } else throw error.MteRuntimeErr(
       s"얘! 지금 멤버 ${memberName.length}개짜리 코객체 만드는 데 값을 ${memberValues.length}개 줘서 되겠니??"
     )
+
+    override def toString: String = s"Type(${typeName.id})"
   }
 
   private case class ObjV(data: Map[StringID, Value],
@@ -176,10 +188,11 @@ package mte {
       case _ => value
     }
 
-    private def fnCall(fnExpr: Expr, argExpr: Expr): Value = pret(fnExpr) match {
+    private def fnCall(fnExpr: Expr, argExpr: Vector[Expr]): Value = pret(fnExpr) match {
       case CloV(argName, fExpr, fEnv) =>
-        val argV: Value = pret(argExpr)
-        interpret(fExpr, fEnv + (argName -> argV))
+        val argV: Vector[Value] = argExpr.map(pret)
+        interpret(fExpr, fEnv ++ argName.zip(argV).toMap)
+      case typeV@TypeV(_, _, _) => typeV.construct(argExpr.map(pret))
       case err@_ => throw error.MteRuntimeErr(
         s"얘! 지금 $err 이게 함수로 보이니?"
       )
@@ -234,9 +247,9 @@ package mte {
           pret(cond) |> unbox match {
             case NumV(data) =>
               if (data != 0)
-                fnCall(sugar.exprToFn(exprTrue), unitE)
+                fnCall(sugar.exprToFn(exprTrue), Vector())
               else
-                fnCall(sugar.exprToFn(exprFalse), unitE)
+                fnCall(sugar.exprToFn(exprFalse), Vector())
             case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
             )
@@ -252,21 +265,10 @@ package mte {
           }
           var condVal = check(cond)
           while (condVal != 0) {
-            fnCall(sugar.exprToFn(exprIn), unitE)
+            fnCall(sugar.exprToFn(exprIn), Vector())
             condVal = check(cond)
           }
           unitV
-        case Construct(typeName, args) => pEnv.get(typeName) match {
-          case Some(value) => value match {
-            case typeVar@TypeV(_, _, _) => typeVar.construct(args.map(this.pretAndUnbox))
-            case _ => throw error.MteRuntimeErr(
-              s"얘! 지금 네 눈에 $typeName 이게 타입 이름으로 보이냐??"
-            )
-          }
-          case None => throw error.MteRuntimeErr(
-            s"얘! 컴파일쟁이($pEnv)들은 $typeName 이런 거 잘 몰라 임마!"
-          )
-        }
         case Proj(obj, id) => pretAndUnbox(obj) match {
           case obj@ObjV(data, supertype) => id match
             case id@StringID(_) => data.get(id) match
@@ -480,7 +482,7 @@ package mte {
     def makeVecFilterExpr(vec: Expr, fn: Expr): Expr = {
       def vecFilter(vec: => Value, fn: => Value): Either[String, Value] = vec match {
         case VecV(vec) => fn match {
-          case fnV@CloV(_, _, _) => Right(VecV(vec.filter(value => fnV.call(value).isTruthy)))
+          case fnV@CloV(_, _, _) => Right(VecV(vec.filter(value => fnV.call(Vector(value)).isTruthy)))
           case _ => Left(s"얘! 지금 $fn 이게 함수로 보이니??")
         }
         case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
@@ -492,7 +494,7 @@ package mte {
     def makeVecRejectExpr(vec: Expr, fn: Expr): Expr = {
       def vecReject(vec: => Value, fn: => Value): Either[String, Value] = vec match {
         case VecV(vec) => fn match {
-          case fnV@CloV(_, _, _) => Right(VecV(vec.filterNot(value => fnV.call(value).isTruthy)))
+          case fnV@CloV(_, _, _) => Right(VecV(vec.filterNot(value => fnV.call(Vector(value)).isTruthy)))
           case _ => Left(s"얘! 지금 $fn 이게 함수로 보이니??")
         }
         case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
@@ -504,7 +506,7 @@ package mte {
     def makeVecMapExpr(vec: Expr, fn: Expr): Expr = {
       def vecMap(vec: => Value, fn: => Value): Either[String, Value] = vec match {
         case VecV(vec) => fn match {
-          case fnV@CloV(_, _, _) => Right(VecV(vec.map(fnV.call)))
+          case fnV@CloV(_, _, _) => Right(VecV(vec.map(x => fnV.call(Vector(x)))))
           case _ => Left(s"얘! 지금 $fn 이게 함수로 보이니??")
         }
         case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
@@ -536,9 +538,9 @@ package mte {
   }
 
   package sugar {
-    def exprToFn(expr: Expr): Expr = Fun(AnonFn1, AnonArg1, expr)
+    def exprToFn(expr: Expr): Expr = Fun(AnonFn1, Vector(), expr)
 
-    def newScope(expr: Expr): Expr = App(exprToFn(expr), unitE)
+    def newScope(expr: Expr): Expr = App(exprToFn(expr), Vector())
 
     def seqs(expressions: Expr*): Expr = {
       @tailrec
@@ -594,25 +596,6 @@ package mte {
       inExpr = inExpr
     )
 
-    def newMultivariableLambda(argName: Vector[String], fnExpr: Expr): Expr = {
-      if (argName.length <= 1)
-        Fun(AnonFn1, StringID(argName(0)), fnExpr)
-      else
-        Fun(AnonFn1, StringID(argName.head), newMultivariableLambda(argName.tail, fnExpr))
-    }
-
-    @tailrec
-    def newMultivariableApp(fnExpr: Expr, args: Vector[Expr]): Expr = {
-      if (args.length < 1) {
-        throw error.MteSyntaxErr(
-          "얘! 인자 리스트에 아무것도 없단다!"
-        )
-      } else if (args.length == 1) {
-        App(fnExpr, args(0))
-      } else {
-        newMultivariableApp(App(fnExpr, args(0)), args.tail)
-      }
-    }
   }
 
   /*
@@ -640,7 +623,7 @@ package mte {
 
     @unused def 법회(rhs: Expr): Expr = ops.makeDivExpr(lhs, rhs)
 
-    @unused def 릴(rhs: Expr): Expr = App(rhs, lhs)
+    @unused def 릴(rhs: Expr): Expr = App(rhs, Vector(lhs))
 
     @unused def 리액션(template: String): Expr = ops.makePrintExpr(lhs, template)
 
@@ -841,10 +824,10 @@ package mte {
   case object 아 {
     @unused
     @targetName("notFact")
-    def ~!(funName: String, argName: String): FunBuilder =
-      FunBuilder(StringID(funName), StringID(argName))
+    def ~!(funName: String, argName: String*): FunBuilder =
+      FunBuilder(StringID(funName), argName.toVector.map(StringID.apply))
 
-    case class FunBuilder(funName: StringID, argName: VarID) {
+    case class FunBuilder(funName: StringID, argName: Vector[VarID]) {
       @unused
       def 는(fExpr: Expr): FunBuilder2 =
         FunBuilder2(funName, argName, fExpr)
@@ -854,7 +837,7 @@ package mte {
         FunBuilder2(funName, argName, fExpr)
     }
 
-    case class FunBuilder2(funName: StringID, argName: VarID, fExpr: Expr) {
+    case class FunBuilder2(funName: StringID, argName: Vector[VarID], fExpr: Expr) {
       @unused
       def 이(@unused x: 참.type): FunBuilder3 =
         FunBuilder3(funName, argName, fExpr)
@@ -864,7 +847,7 @@ package mte {
         FunBuilder3(funName, argName, fExpr)
     }
 
-    case class FunBuilder3(funName: StringID, argName: VarID, fExpr: Expr) {
+    case class FunBuilder3(funName: StringID, argName: Vector[VarID], fExpr: Expr) {
       @unused
       def 좋구나(@unused x: EndState): Expr =
         Seq(ValDef(funName, Fun(funName, argName, fExpr)), Id(funName))
@@ -873,7 +856,7 @@ package mte {
 
   case object 참
 
-  class MultiLambdaBuilder(argIds: Vector[String]) {
+  class MultiLambdaBuilder(argIds: Vector[StringID]) {
     @unused
     def 은(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
 
@@ -888,20 +871,20 @@ package mte {
     def 는(fnExprs: Vector[Expr]): MultiLambdaBuilder2 =
       MultiLambdaBuilder2(argIds, sugar.vecToSeq(fnExprs))
 
-    class MultiLambdaBuilder2(argIds: Vector[String], fnExpr: Expr) {
+    class MultiLambdaBuilder2(argIds: Vector[StringID], fnExpr: Expr) {
       @unused
-      def 다(@unused joyGo: EndState4): Expr = sugar.newMultivariableLambda(argIds, fnExpr)
+      def 다(@unused joyGo: EndState4): Expr = Fun(AnonFn1, argIds, fnExpr)
 
       @unused
-      def 이다(@unused joyGo: EndState4): Expr = sugar.newMultivariableLambda(argIds, fnExpr)
+      def 이다(@unused joyGo: EndState4): Expr = Fun(AnonFn1, argIds, fnExpr)
     }
   }
 
   implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[Expr]) extends MultiLambdaBuilder(argIds.map {
-    case Id(StringID(id)) => id
+    case Id(StringID(id)) => StringID(id)
     case _ => throw error.MteSyntaxErr(s"얘! 지금 $argIds 이게 변수명으로 보이니?!?!")
   })
-  implicit class MultiLambdaBuilderFromStr(argName: String) extends MultiLambdaBuilder(Vector(argName))
+  implicit class MultiLambdaBuilderFromStr(argName: String) extends MultiLambdaBuilder(Vector(StringID(argName)))
 
   /**
    * 케인인님 함수호출 한판해요
@@ -910,20 +893,13 @@ package mte {
    */
   case class AppBuilder(f: Expr) {
     @unused
-    def 아(arg: Expr): AppBuilder2 = AppBuilder2(f, Vector(arg))
+    def 아(args: Expr*): AppBuilder2 = AppBuilder2(f, args.toVector)
 
     @unused
-    def 아(args: Vector[Expr]): AppBuilder2 = AppBuilder2(f, args)
-
-    @unused
-    def 야(arg: Expr): AppBuilder2 = AppBuilder2(f, Vector(arg))
-
-    @unused
-    def 야(args: Vector[Expr]): AppBuilder2 = AppBuilder2(f, args)
+    def 야(args: Expr*): AppBuilder2 = AppBuilder2(f, args.toVector)
 
     case class AppBuilder2(f: Expr, args: Vector[Expr]) {
-      def 먹어라(@unused x: EndState2): Expr =
-        sugar.newMultivariableApp(f, args)
+      def 먹어라(@unused x: EndState2): Expr = App(f, args)
     }
   }
 
@@ -1292,13 +1268,10 @@ package mte {
     def 중에는(@unused x: EndState7): TypeEMethodBuilder2 = TypeEMethodBuilder2(methodName)
     case class TypeEMethodBuilder2(methodName: VarID) {
       @unused
-      def 아무리(arg: VarID): TypeEMethodBuilder3 = TypeEMethodBuilder3(methodName, arg)
-
-      @unused
-      def 아무리(arg: String): TypeEMethodBuilder3 = TypeEMethodBuilder3(methodName, StringID(arg))
+      def 아무리(arg: VarIDImplicit*): TypeEMethodBuilder3 = TypeEMethodBuilder3(methodName, arg.toVector.map(x => x.id))
     }
 
-    case class TypeEMethodBuilder3(methodName: VarID, arg: VarID) {
+    case class TypeEMethodBuilder3(methodName: VarID, arg: Vector[VarID]) {
       @unused
       def 라도(fExpr: Expr): TypeEMethodBuilder4 = TypeEMethodBuilder4(methodName, arg, fExpr)
 
@@ -1306,13 +1279,13 @@ package mte {
       def 이라도(fExpr: Expr): TypeEMethodBuilder4 = TypeEMethodBuilder4(methodName, arg, fExpr)
     }
 
-    case class TypeEMethodBuilder4(methodName: VarID, arg: VarID, fExpr: Expr) {
+    case class TypeEMethodBuilder4(methodName: VarID, arg: Vector[VarID], fExpr: Expr) {
       @unused
       def 할(@unused x: 수가.type): TypeEMethodBuilder5 =
         TypeEMethodBuilder5(methodName, arg, fExpr)
     }
 
-    case class TypeEMethodBuilder5(methodName: VarID, arg: VarID, fExpr: Expr) {
+    case class TypeEMethodBuilder5(methodName: VarID, arg: Vector[VarID], fExpr: Expr) {
       @unused
       def 없단다(@unused x: EndState7): TypeEMethodBuilderFinal =
         TypeEMethodBuilderFinal(methodName, arg, fExpr)
@@ -1321,7 +1294,7 @@ package mte {
 
   case object 수가
 
-  private case class TypeEMethodBuilderFinal(methodName: VarID, arg: VarID, fExpr: Expr)
+  private case class TypeEMethodBuilderFinal(methodName: VarID, arg: Vector[VarID], fExpr: Expr)
 
   implicit class TypeEMethodBuilderFromString(id: String) extends TypeEMethodBuilder1(StringID(id))
   implicit class TypeEMethodBuilderFromID(id: VarID) extends TypeEMethodBuilder1(id)
@@ -1363,14 +1336,6 @@ package mte {
      *
      */
     private val rand: Random = new Random()
-
-    def randomStringGen(n: Int): String = {
-      var str: String = ""
-      for (_ <- 0 to n) {
-        str += rand.nextPrintableChar()
-      }
-      str
-    }
 
     def randBetween(lbdInclusive: Int, ubdExclusive: Int): Int =
       rand.between(lbdInclusive, ubdExclusive)
