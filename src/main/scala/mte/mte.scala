@@ -17,6 +17,16 @@ package mte {
         s"얘! 지금 네 눈에 $this 이게 참/거짓을 따질 수 있는 값으로 보이니??"
       )
     }
+
+    def toFOV: FOV = this match {
+      case fov: FOV => fov
+      case nfov: NFOV => nfov.decay
+    }
+  }
+
+  sealed trait FOV extends Value
+  sealed trait NFOV extends Value {
+    def decay: FOV
   }
 
   sealed trait Type
@@ -28,7 +38,7 @@ package mte {
   }
   private case object ThisKW extends VarID
   private case object AnonFn1 extends VarID
-  private case object AnonArg1 extends VarID
+  private case class AnonArg(argIdx: Int) extends VarID
 
   case class VarIDImplicit(id: VarID)
   implicit class VarIDImplicitFromVarID(id: VarID) extends VarIDImplicit(id)
@@ -42,7 +52,11 @@ package mte {
     @unused
     @targetName("plusPlus")
     def ++(rhs: Num): Num = Num(data * 10 + rhs.data)
+
+    override def toString: String = data.toString
   }
+
+  case class NewValue(value: FOV) extends Expr
 
   case class UnitE() extends Expr {
     override def toString: String = "unit"
@@ -57,34 +71,36 @@ package mte {
   }
 
   private case class TernaryOp(x: Expr, y: Expr, z: Expr,
-                               op: (Value, Value, Value) => Either[String, Value],
+                               op: (=> Value, => Value, => Value) => Either[String, Value],
                                opName: String) extends Expr {
     override def toString: String =
       s"<$opName>($x, $y, $z)"
   }
 
-  private case class Id(name: VarID) extends Expr
+  private case class Id(name: VarID) extends Expr {
+    override def toString: String = s"\"$name\""
+  }
   private object Id {
     def apply(id: String): Id = {
       Id(StringID(id))
     }
   }
 
-  private case class ValDef(valName: StringID, initExpr: Expr) extends Expr
+  private case class ValDef(valName: StringID, initExpr: Expr, next: Expr) extends Expr
 
   private case class Fun(funName: VarID, argName: Vector[VarID], fExpr: Expr) extends Expr
 
-  private case class App(fnExpr: Expr, argExpr: Vector[Expr]) extends Expr
+  private case class App(fnExpr: Expr, argExpr: Vector[Expr]) extends Expr {
+    override def toString: String = s"App($fnExpr, ${argExpr.toString.drop(7).dropRight(1)})"
+  }
 
   private case class Seq(lhs: Expr, rhs: Expr) extends Expr
-
-  private case class IfN0(cond: Expr, exprTrue: Expr, exprFalse: Expr) extends Expr
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
   private case class Proj(obj: Expr, id: VarID) extends Expr
 
-  private case class DefBox(id: StringID, initExpr: Expr) extends Expr
+  private case class BoxDef(id: StringID, initExpr: Expr, next: Expr) extends Expr
 
   private case class SetBox(box: Expr, setExpr: Expr) extends Expr
 
@@ -92,11 +108,10 @@ package mte {
 
   private case class HMap(data: Map[Expr, Expr]) extends Expr
 
-  private case class Try(exprTry: Expr) extends Expr
-
-  private case class TypeDef(memberName: Vector[StringID],
-                             methods: Map[VarID, Expr],
-                             typeName: StringID) extends Expr
+  private case class ClassDef(memberName: Vector[StringID],
+                              methods: Map[VarID, Expr],
+                              typeName: StringID,
+                              next: Expr) extends Expr
 
   private case class BuiltinFnE2E(fn: Expr => Expr, arg: Expr, opName: String) extends Expr {
     override def toString: String = s"BF<$opName>($arg)"
@@ -104,16 +119,20 @@ package mte {
 
 
   // Values
-  case class UnitV() extends Value {
+  case class UnitV() extends FOV {
     override def toString: String = "UnitV"
   }
 
-  private case class NumV(data: BigInt) extends Value {
+  private case class NumV(data: BigInt) extends FOV {
     override def toString: String = "%s".format(data)
   }
 
-  private case class CloV(argName: Vector[VarID], fExpr: Expr, var fEnv: Env) extends Value {
-    override def toString: String = s"CloV($argName, $fExpr)"
+  private case class StrV(data: String) extends FOV {
+    override def toString: String = data
+  }
+
+  private case class CloV(argName: Vector[VarID], fExpr: Expr, var fEnv: Env) extends FOV {
+    override def toString: String = s"함수(인자:[${argName.toString.drop(7).dropRight(1)}], 본문:[$fExpr])"
 
     def call(arg: Vector[Value]): Value = {
       if (argName.length != arg.length) {
@@ -121,21 +140,22 @@ package mte {
           s"얘! 지금 돈 ${arg.length} 원에 함수 ${this}를 불러달라고 한 거니?? 단가가 안 맞잖아 임마!!"
         )
       }
-      interpret(fExpr, fEnv ++ argName.zip(arg).toMap)
+      pret(fExpr, fEnv ++ argName.zip(arg).toMap)
     }
   }
 
-  private case class VecV(data: Vector[Value]) extends Value {
+  private case class VecV(data: Vector[Value]) extends FOV {
+    override def toString: String = s"한줄서기(${data.toString.drop(7).dropRight(1)})"
+  }
+
+  private case class HMapV(data: Map[Value, Value]) extends FOV {
     override def toString: String = data.toString()
   }
 
-  private case class HMapV(data: Map[Value, Value]) extends Value {
-    override def toString: String = data.toString()
-  }
-
-  private case class TypeV(memberName: Vector[StringID],
-                           methods: Map[VarID, Value],
-                           typeName: StringID) extends Value {
+  private case class ClassV(memberNames: Vector[StringID],
+                            methods: Map[VarID, Value],
+                            typeName: StringID,
+                            var cEnv: Env) extends NFOV {
     def makeMethodOf(obj: ObjV, methodName: VarID): Value = methods.get(methodName) match {
       case Some(value) => value match {
         case fn@CloV(_, _, _) =>
@@ -147,173 +167,158 @@ package mte {
         )
       }
       case None => throw error.MteRuntimeErr(
-        s"얘! 지금 클래스 ${typeName}의 인스턴스 ${obj}가 ${methodName}를 알겠니??"
+        s"얘! 지금 코괴물 ${typeName}의 코객체 ${obj}가 ${methodName}를 알겠니??"
       )
     }
 
-    def construct(memberValues: Vector[Value]): ObjV = if (memberName.length == memberValues.length) {
-      ObjV(memberName.zip(memberValues).toMap, supertype=this)
+    def construct(memberValues: Vector[Value]): ObjV = if (memberNames.length == memberValues.length) {
+      ObjV(memberNames.zip(memberValues).toMap, supertype=this)
     } else throw error.MteRuntimeErr(
-      s"얘! 지금 멤버 ${memberName.length}개짜리 코객체 만드는 데 값을 ${memberValues.length}개 줘서 되겠니??"
+      s"얘! 지금 멤버 ${memberNames.length}개짜리 코객체 만드는 데 값을 ${memberValues.length}개 줘서 되겠니??"
     )
 
-    override def toString: String = s"Type(${typeName.id})"
+    override def decay: FOV = CloV(memberNames, App(Id(typeName), memberNames.map(x => Id(x))), cEnv)
+
+    override def toString: String = s"코괴물(${typeName.id})"
   }
 
   private case class ObjV(data: Map[StringID, Value],
-                          supertype: TypeV) extends Value
+                          supertype: ClassV) extends FOV {
+    override def toString: String =
+      s"${supertype.typeName.id}(${data.toString().drop(4).dropRight(1)})"
+  }
 
   /**
-   * 가비지 컬렉션이 더 잘 되는 새로운 박스를 준비했어요~~ 버그가 있는지 테스트 중이다 맨이야
    * @param data 데이터의 변경 과정을 기록해놓음
    * @param addr 현재 박스가 데이터의 총 변경 과정 중 몇 번째 원소에 해당하는 값을 갖고 있는지
    */
-  case class BoxV(var data: Vector[Value], var addr: Addr) extends Value {
+  case class BoxV(var data: Vector[Value], var addr: Addr) extends NFOV {
     def get: Value = data(addr)
 
     def set(newData: Value): Unit = {
       addr = data.length
       data = data.appended(newData)
     }
+
+    override def decay: FOV = this.get match {
+      case fov: FOV => fov
+      case nfov: NFOV => nfov.decay
+    }
+
+    override def toString: String = s"BoxV($get)"
   }
 
   def makeNewBox(value: Value): BoxV = BoxV(Vector(value), 0)
 
-  case class Process(var pEnv: Env) {
-
-    @unused
-    @tailrec
-    private def unbox(value: Value): Value = value match {
-      case box@BoxV(_, _) => unbox(box.get)
-      case _ => value
-    }
-
-    private def fnCall(fnExpr: Expr, argExpr: Vector[Expr]): Value = pret(fnExpr) match {
-      case CloV(argName, fExpr, fEnv) =>
-        val argV: Vector[Value] = argExpr.map(pret)
-        interpret(fExpr, fEnv ++ argName.zip(argV).toMap)
-      case typeV@TypeV(_, _, _) => typeV.construct(argExpr.map(pret))
-      case err@_ => throw error.MteRuntimeErr(
-        s"얘! 지금 $err 이게 함수로 보이니?"
-      )
-    }
-
-    private def validateID(id: VarID): Unit = id match {
+  def pret(expr: Expr, env: Env): Value = {
+    def validateID(id: VarID): Unit = id match {
       case StringID(id) => if (id.contains("킹") && id.contains("갓")) {
         throw error.MteRuntimeErr("내가 킹하고 갓하고 함부로 막 붙이지 말라 그랬지!!")
       }
       case _ =>
     }
 
-    private def pretAndUnbox(expr: Expr): Value = unbox(pret(expr))
+    def fnCall(fnExpr: Expr, argExpr: Vector[Expr]): Value = pret(fnExpr, env) match {
+      case CloV(argName, fExpr, fEnv) =>
+        if (argName.length != argExpr.length) {
+          throw error.MteSyntaxErr()
+        }
+        val argV: Vector[Value] = argExpr.map(x => pret(x, env).toFOV)
+        pret(fExpr, fEnv ++ argName.zip(argV).toMap)
+      case typeV@ClassV(_, _, _, _) => typeV.construct(argExpr.map(x => pret(x, env)))
+      case err@_ => throw error.MteRuntimeErr(
+        s"얘! 지금 $err 이게 함수로 보이니?"
+      )
+    }
 
-    def pret(expr: Expr): Value = {
-      expr match {
-        case Num(data) => NumV(data)
-        case UnitE() => unitV
-        case BinaryOp(lhs, rhs, _, op) => op(pret(lhs) |> unbox, pret(rhs) |> unbox) match {
-          case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
-          case Right(value) => value
-        }
-        case TernaryOp(x, y, z, op, _) => op(pret(x) |> unbox, pret(y) |> unbox, pret(z) |> unbox) match {
-          case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
-          case Right(value) => value
-        }
-        case Id(name) => pEnv.get(name) match {
-          case Some(value) => value match {
-            case NumV(num) => name match {
-              case StringID(id) => NumV(num - 3000 * id.count(_ == '코'))
-              case _ => NumV(num)
-            }
-            case value@_ => value
+    expr match {
+      case Num(data) => NumV(data)
+      case NewValue(value) => value
+      case UnitE() => unitV
+      case BinaryOp(lhs, rhs, _, op) => op(pret(lhs, env).toFOV, pret(rhs, env).toFOV) match {
+        case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
+        case Right(value) => value
+      }
+      case TernaryOp(x, y, z, op, _) => op(pret(x, env).toFOV, pret(y, env).toFOV, pret(z, env).toFOV) match {
+        case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
+        case Right(value) => value
+      }
+      case Id(name) => env.get(name) match {
+        case Some(value) => value match {
+          case NumV(num) => name match {
+            case StringID(id) => NumV(num - 3000 * id.count(_ == '코'))
+            case _ => NumV(num)
           }
-          case _ => throw error.MteRuntimeErr(
-            s"얘! 컴파일쟁이($pEnv)들은 $name 이런 거 잘 몰라 임마!"
-          )
+          case value@_ => value
         }
-        case ValDef(valName, initExpr) =>
-          validateID(valName)
-          val initV: Value = pret(initExpr) |> unbox
-          pEnv += (valName -> initV)
-          initV
-        case Fun(funName, argName, fExpr) =>
-          val ret: CloV = CloV(argName, fExpr, pEnv)
-          ret.fEnv += (funName -> ret)
-          ret
-        case App(fnExpr, argExpr) => fnCall(fnExpr, argExpr)
-        case Seq(lhs, rhs) =>
-          pret(lhs); pret(rhs)
-        case IfN0(cond, exprTrue, exprFalse) =>
-          pret(cond) |> unbox match {
-            case NumV(data) =>
-              if (data != 0)
-                fnCall(sugar.exprToFn(exprTrue), Vector())
-              else
-                fnCall(sugar.exprToFn(exprFalse), Vector())
+        case _ => throw error.MteRuntimeErr(
+          s"얘! 컴파일쟁이($env)들은 $name 이런 거 잘 몰라 임마!"
+        )
+      }
+      case ValDef(valName, initExpr, next) =>
+        validateID(valName)
+        val initV: Value = pret(initExpr, env).toFOV
+        pret(next, env + (valName -> initV))
+      case Fun(funName, argName, fExpr) =>
+        val ret: CloV = CloV(argName, fExpr, env)
+        ret.fEnv += (funName -> ret)
+        ret
+      case App(fnExpr, argExpr) => fnCall(fnExpr, argExpr)
+      case Seq(lhs, rhs) =>
+        pret(lhs, env); pret(rhs, env)
+      case WhileN0(cond, exprIn) =>
+        val check = (condExpr: Expr) => {
+          pret(condExpr, env).toFOV match {
+            case NumV(data) => data
             case err@_ => throw error.MteRuntimeErr(
               s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
             )
           }
-        case WhileN0(cond, exprIn) =>
-          val check = (condExpr: Expr) => {
-            pret(condExpr) |> unbox match {
-              case NumV(data) => data
-              case err@_ => throw error.MteRuntimeErr(
-                s"얘! 지금 $err 이게 조건문 안에 들어갈 수 있겠니?? 죽여벌랑"
-              )
-            }
-          }
-          var condVal = check(cond)
-          while (condVal != 0) {
-            fnCall(sugar.exprToFn(exprIn), Vector())
-            condVal = check(cond)
-          }
-          unitV
-        case Proj(obj, id) => pretAndUnbox(obj) match {
-          case obj@ObjV(data, supertype) => id match
-            case id@StringID(_) => data.get(id) match
-              case Some(value) => value
-              case None => supertype.makeMethodOf(obj, id)
-            case _ => supertype.makeMethodOf(obj, id)
-          case _ => throw error.MteRuntimeErr(
-            s"얘! 지금 네 눈에 $obj 이게 객체로 보이니??"
+        }
+        var condVal = check(cond)
+        while (condVal != 0) {
+          fnCall(sugar.exprToFn(exprIn), Vector())
+          condVal = check(cond)
+        }
+        unitV
+      case Proj(obj, id) => pret(obj, env).toFOV match {
+        case obj@ObjV(data, supertype) => id match
+          case id@StringID(_) => data.get(id) match
+            case Some(value) => value
+            case None => supertype.makeMethodOf(obj, id)
+          case _ => supertype.makeMethodOf(obj, id)
+        case _ => throw error.MteRuntimeErr(
+          s"얘! 지금 네 눈에 $obj 이게 객체로 보이니??"
+        )
+      }
+      case BoxDef(id, initExpr, next) =>
+        validateID(id)
+        val initV: Value = pret(initExpr, env).toFOV
+        pret(next, env + (id -> makeNewBox(initV)))
+      case SetBox(ref, setExpr) =>
+        val setVal = pret(setExpr, env).toFOV
+        pret(ref, env) match {
+          case box@BoxV(_, _) =>
+            box.set(setVal)
+            setVal
+          case err@_ => throw error.MteRuntimeErr(
+            s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$env"
           )
         }
-        case DefBox(id, initExpr) =>
-          validateID(id)
-          val initV: Value = pret(initExpr) |> unbox
-          pEnv += (id -> makeNewBox(initV))
-          initV
-        case SetBox(ref, setExpr) =>
-          val setVal = pret(setExpr) |> unbox
-          pret(ref) match {
-            case box@BoxV(_, _) =>
-              box.set(setVal)
-              setVal
-            case err@_ => throw error.MteRuntimeErr(
-              s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$pEnv"
-            )
-          }
-        case Vec(data) => VecV(data.map(pret))
-        case HMap(data) => HMapV(data.map((key, value) => (pret(key), pret(value))))
-        case TypeDef(memberName, methods, typeName) =>
-          pEnv += (typeName -> TypeV(
-            memberName, methods.map((key, value) => (key, pret(value))), typeName
-          ))
-          unitV
-        case Try(exprTry) =>
-          try {
-            pret(exprTry)
-            NumV(1)
-          } catch {
-            case _: error.MteRuntimeErr => NumV(0)
-          }
-        case BuiltinFnE2E(fn, arg, _) => pret(fn(arg))
-      }
+      case Vec(data) => VecV(data.map(x => pret(x, env)))
+      case HMap(data) => HMapV(data.map((key, value) => (pret(key, env), pret(value, env))))
+      case ClassDef(memberName, methods, typeName, next) =>
+        if (env.contains(typeName)) throw error.MteRuntimeErr(
+          s"얘! 이미 사용하고 있는 변수명은 코괴물 이름이 되지 아내!"
+        )
+        val newClass = ClassV(
+          memberName, methods.map((key, value) => (key, pret(value, env))), typeName, env
+        )
+        newClass.cEnv += (typeName -> newClass)
+        pret(next, env + (typeName -> newClass))
+      case BuiltinFnE2E(fn, arg, _) => pret(fn(arg), env)
     }
   }
-
-  private def interpret(expr: Expr, env: Env): Value = Process(env).pret(expr)
 
   val unitE: UnitE = UnitE()
   val unitV: UnitV = UnitV()
@@ -429,13 +434,6 @@ package mte {
       BinaryOp(lbdInclusive, ubdExclusive, "vecIota", vecIota)
     }
 
-    def vecAppend(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
-      case VecV(lData) => Right(VecV(lData :+ rhs))
-      case _ => Left(s"얘! 지금 한줄서기 원소 추가 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 여기다 뭘 넣겠다는 거니??")
-    }
-
-    def makeVecAppendExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "VecAppend", vecAppend)
-
     def makeExtExpr(lhs: Expr, rhs: Expr): Expr = {
       def extension(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
         case VecV(lData) => rhs match {
@@ -517,8 +515,12 @@ package mte {
   }
 
   package ops3 {
-    def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] =
-      if (cond.isTruthy) Right(yes) else Right(no)
+    def makeTernaryIfExpr(cond: Expr, yes: Expr, no: Expr): Expr = {
+      def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] =
+        if (cond.isTruthy) Right(yes) else Right(no)
+
+      TernaryOp(cond, yes, no, ternaryIf, "If")
+    }
 
     def makeVecUpdatedExpr(vecE: Expr, idxE: Expr, dataE: Expr): Expr = {
       def vecUpdated(vec: => Value, idx: => Value, data: => Value): Either[String, Value] = vec match {
@@ -542,23 +544,6 @@ package mte {
 
     def newScope(expr: Expr): Expr = App(exprToFn(expr), Vector())
 
-    def seqs(expressions: Expr*): Expr = {
-      @tailrec
-      def help(expressions: Vector[Expr], ret: Expr): Expr = {
-        if (expressions.nonEmpty) {
-          help(expressions.tail, Seq(ret, expressions.head))
-        } else {
-          ret
-        }
-      }
-
-      if (expressions.length == 1) {
-        expressions.head
-      } else {
-        help(expressions.tail.toVector, expressions.head)
-      }
-    }
-
     def vecToSeq(vec: Vector[Expr]): Expr = {
       @tailrec
       def help(vec: Vector[Expr], ret: Expr): Expr = {
@@ -577,22 +562,17 @@ package mte {
     }
 
     def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
-      newScope(
-        Seq(
-          DefBox(StringID(iterName), initExpr),
-          WhileN0(condExpr, Seq(
-            inExpr,
-            manipulationExpr
-          ))
-        )
-      )
+      BoxDef(StringID(iterName), initExpr, WhileN0(condExpr, Seq(
+        inExpr,
+        manipulationExpr
+      )))
     }
 
     def newSimpleFor(iterName: String, lbdInclusive: Expr, ubdExclusive: Expr, inExpr: Expr): Expr = newFor(
       iterName = iterName,
       initExpr = lbdInclusive,
       condExpr = ops.makeGtExpr(ubdExclusive, Id(StringID(iterName))),
-      manipulationExpr = SetBox(Id(StringID(iterName)), ops.makeAddExpr(Id(StringID(iterName)), 1)),
+      manipulationExpr = SetBox(Id(StringID(iterName)), ops.makeAddExpr(Id(StringID(iterName)), Num(1))),
       inExpr = inExpr
     )
 
@@ -611,8 +591,37 @@ package mte {
   (all letters, $, _)
   */
 
-  implicit def toId(name: String): Expr = Id(name)
-  implicit def toNum(num: Int): Expr = Num(num)
+  sealed trait CodeFragment
+  case class CodeFragmentGeneral(expr: Expr) extends CodeFragment
+  case class ValDefFragment(name: StringID, expr: Expr) extends CodeFragment
+  case class BoxDefFragment(name: StringID, expr: Expr) extends CodeFragment
+  case class ClassDefFragment(memberName: Vector[StringID],
+                              methods: Map[VarID, Expr],
+                              id: StringID) extends CodeFragment
+
+  def joinFragments(fragments: Vector[CodeFragment]): Expr = {
+    if (fragments.length == 1) {
+      fragments.head match {
+        case CodeFragmentGeneral(expr) => expr
+        case ValDefFragment(name, expr) => ValDef(name, expr, unitE)
+        case BoxDefFragment(name, expr) => BoxDef(name, expr, unitE)
+        case ClassDefFragment(memberName, methods, id) => ClassDef(memberName, methods, id, unitE)
+      }
+    } else {
+      fragments.head match
+        case CodeFragmentGeneral(expr) => Seq(expr, joinFragments(fragments.tail))
+        case ValDefFragment(name, expr) => ValDef(name, expr, joinFragments(fragments.tail))
+        case BoxDefFragment(name, expr) => BoxDef(name, expr, joinFragments(fragments.tail))
+        case ClassDefFragment(memberName, methods, id) =>
+          ClassDef(memberName, methods, id, joinFragments(fragments.tail))
+    }
+  }
+
+  implicit def exprToFragment(expr: Expr): CodeFragment = CodeFragmentGeneral(expr)
+  implicit def strToId(id: String): Expr = Id(id)
+  implicit def intToNum(num: Int): Expr = Num(num)
+  implicit def toIdFrag(name: String): CodeFragment = CodeFragmentGeneral(Id(name))
+  implicit def toNumFrag(num: Int): CodeFragment = CodeFragmentGeneral(Num(num))
 
   class ExprOps(lhs: Expr) {
     @unused def 배(rhs: Expr): Expr = ops.makeAddExpr(lhs, rhs)
@@ -672,21 +681,10 @@ package mte {
 
   @unused val 나: Expr = Id(ThisKW)
 
-  def 춘잣: ProgramBuilder = ProgramBuilder(Process(Map()))
-
-  case class ProgramBuilder(process: Process) {
+  case object 춘잣 {
     @targetName("fact")
     @unused
-    def ! (expr: Expr*) : ProgramBuilder = factHelper(expr.toVector)
-
-    @unused
-    def 케바바바밥줘(expr: Expr*): ProgramBuilder = factHelper(expr.toVector)
-
-    private def factHelper(expr: Vector[Expr]): ProgramBuilder = {
-      val sequencedExpr = sugar.vecToSeq(expr)
-      val result: Value = process.pret(sequencedExpr)
-      this
-    }
+    def !(frag: CodeFragment*): Value = pret(joinFragments(frag.toVector), Map())
   }
 
   @unused
@@ -756,13 +754,13 @@ package mte {
   case object 유링게슝한 {
     @targetName("question")
     @unused
-    def ?(condExpr: Expr)(trueExprs: Expr*): Ifn0Builder =
-      Ifn0Builder(condExpr, sugar.vecToSeq(trueExprs.toVector))
+    def ?(condExpr: Expr)(trueExprs: CodeFragment*): Ifn0Builder =
+      Ifn0Builder(condExpr, joinFragments(trueExprs.toVector))
 
     case class Ifn0Builder(condExpr: Expr, trueExpr: Expr) {
       @unused
-      def 안유링게슝(falseExprs: Expr*): Expr =
-        IfN0(condExpr, trueExpr, sugar.vecToSeq(falseExprs.toVector))
+      def 안유링게슝(falseExprs: CodeFragment*): Expr =
+        ops3.makeTernaryIfExpr(condExpr, trueExpr, joinFragments(falseExprs.toVector))
     }
   }
 
@@ -794,22 +792,22 @@ package mte {
 
     case class ValBuilder2(name: StringID, expr: Expr) {
       @unused
-      def 를(@unused h: 했대.type): Expr =
-        ValDef(name, expr)
+      def 를(@unused h: 했대.type): CodeFragment =
+        ValDefFragment(name, expr)
 
       @unused
-      def 을(@unused h: 했대.type): Expr =
-        ValDef(name, expr)
+      def 을(@unused h: 했대.type): CodeFragment =
+        ValDefFragment(name, expr)
 
       @unused
       def 발행(@unused x: NFT.type): DefBoxBuilder = DefBoxBuilder(name, expr)
 
       case class DefBoxBuilder(name: StringID, expr: Expr) {
         @unused
-        def 를(@unused h: 했대.type): Expr = DefBox(name, expr)
+        def 를(@unused h: 했대.type): CodeFragment = BoxDefFragment(name, expr)
 
         @unused
-        def 을(@unused h: 했대.type): Expr = DefBox(name, expr)
+        def 을(@unused h: 했대.type): CodeFragment = BoxDefFragment(name, expr)
       }
     }
   }
@@ -829,12 +827,12 @@ package mte {
 
     case class FunBuilder(funName: StringID, argName: Vector[VarID]) {
       @unused
-      def 는(fExpr: Expr): FunBuilder2 =
-        FunBuilder2(funName, argName, fExpr)
+      def 는(fExpr: CodeFragment*): FunBuilder2 =
+        FunBuilder2(funName, argName, joinFragments(fExpr.toVector))
 
       @unused
-      def 은(fExpr: Expr): FunBuilder2 =
-        FunBuilder2(funName, argName, fExpr)
+      def 은(fExpr: CodeFragment*): FunBuilder2 =
+        FunBuilder2(funName, argName, joinFragments(fExpr.toVector))
     }
 
     case class FunBuilder2(funName: StringID, argName: Vector[VarID], fExpr: Expr) {
@@ -849,29 +847,29 @@ package mte {
 
     case class FunBuilder3(funName: StringID, argName: Vector[VarID], fExpr: Expr) {
       @unused
-      def 좋구나(@unused x: EndState): Expr =
-        Seq(ValDef(funName, Fun(funName, argName, fExpr)), Id(funName))
+      def 좋구나(@unused x: EndState): CodeFragment =
+        ValDefFragment(funName, Fun(funName, argName, fExpr))
     }
   }
 
   case object 참
 
-  class MultiLambdaBuilder(argIds: Vector[StringID]) {
+  class LambdaBuilder(argIds: Vector[StringID]) {
     @unused
-    def 은(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
+    def 은(fnExpr: Expr): LambdaBuilder2 = LambdaBuilder2(argIds, fnExpr)
 
     @unused
-    def 은(fnExprs: Vector[Expr]): MultiLambdaBuilder2 =
-      MultiLambdaBuilder2(argIds, sugar.vecToSeq(fnExprs))
+    def 은(fnExprs: Vector[Expr]): LambdaBuilder2 =
+      LambdaBuilder2(argIds, sugar.vecToSeq(fnExprs))
 
     @unused
-    def 는(fnExpr: Expr): MultiLambdaBuilder2 = MultiLambdaBuilder2(argIds, fnExpr)
+    def 는(fnExpr: Expr): LambdaBuilder2 = LambdaBuilder2(argIds, fnExpr)
 
     @unused
-    def 는(fnExprs: Vector[Expr]): MultiLambdaBuilder2 =
-      MultiLambdaBuilder2(argIds, sugar.vecToSeq(fnExprs))
+    def 는(fnExprs: Vector[Expr]): LambdaBuilder2 =
+      LambdaBuilder2(argIds, sugar.vecToSeq(fnExprs))
 
-    class MultiLambdaBuilder2(argIds: Vector[StringID], fnExpr: Expr) {
+    class LambdaBuilder2(argIds: Vector[StringID], fnExpr: Expr) {
       @unused
       def 다(@unused joyGo: EndState4): Expr = Fun(AnonFn1, argIds, fnExpr)
 
@@ -880,11 +878,11 @@ package mte {
     }
   }
 
-  implicit class MultiLambdaBuilderFromVecStr(argIds: Vector[Expr]) extends MultiLambdaBuilder(argIds.map {
+  implicit class LambdaBuilderFromVecStr(argIds: Vector[Expr]) extends LambdaBuilder(argIds.map {
     case Id(StringID(id)) => StringID(id)
     case _ => throw error.MteSyntaxErr(s"얘! 지금 $argIds 이게 변수명으로 보이니?!?!")
   })
-  implicit class MultiLambdaBuilderFromStr(argName: String) extends MultiLambdaBuilder(Vector(StringID(argName)))
+  implicit class LambdaBuilderFromStr(argName: String) extends LambdaBuilder(Vector(StringID(argName)))
 
   /**
    * 케인인님 함수호출 한판해요
@@ -909,7 +907,7 @@ package mte {
 
   /**
    * 케인님이 조건문이 거짓이 되기 전까지 강제연결을 해 주신단다!
-   * 문법: 강제연결 (cond) {expr}결
+   * 문법: 강제연결 (cond) {expr}
    * @param cond 조건문
    * @param exprIn 조건문이 참인 동안 실행할 명령
    */
@@ -926,11 +924,11 @@ package mte {
   case class SimpleForBuilder(n: Expr) {
     @unused
     def 수(iterName: String)(forExpr: Expr): Expr =
-      sugar.newSimpleFor(iterName, 0, n, forExpr)
+      sugar.newSimpleFor(iterName, Num(0), n, forExpr)
 
     @unused
     def 수(forExpr: Expr): Expr =
-      sugar.newSimpleFor("", 0, n, forExpr)
+      sugar.newSimpleFor("", Num(0), n, forExpr)
   }
 
   implicit class SimpleForBuilderFromInt(n: Int) extends SimpleForBuilder(Num(n))
@@ -939,8 +937,8 @@ package mte {
 
   case class RunningForBuilder(lhs: Expr) {
     @unused
-    def 달려가(rhs: Expr)(iterName: String)(forExpr: Expr): Expr =
-      sugar.newSimpleFor(iterName, lhs, rhs, forExpr)
+    def 달려가(rhs: Expr)(iterName: String)(forExpr: CodeFragment*): Expr =
+      sugar.newSimpleFor(iterName, lhs, rhs, joinFragments(forExpr.toVector))
   }
 
   implicit class RunningForBuilderFromExpr(expr: Expr) extends RunningForBuilder(expr)
@@ -979,18 +977,6 @@ package mte {
     @unused
     def 아저씨(expr: Expr): Expr =
       sugar.newScope(expr)
-  }
-
-  /**
-   * 내부 식이 문법적으로 올바른 식이면 1, 아니면 0을 리턴한단다.
-   * 문법: 주제넘은? {expr}
-   */
-  @unused
-  case object 주제넘은 {
-    @unused
-    @targetName("question")
-    def ? (expr: Expr): Expr =
-      Try(expr)
   }
 
   /**
@@ -1081,7 +1067,7 @@ package mte {
 
   @unused
   case object 뭐 {
-    @unused def 드시냐고(ubdExclusive: Expr): IotaBuilder = IotaBuilder(0, ubdExclusive)
+    @unused def 드시냐고(ubdExclusive: Expr): IotaBuilder = IotaBuilder(Num(0), ubdExclusive)
 
     @unused def 드시냐고(lbdInclusive: Expr, ubdExclusive: Expr): IotaBuilder =
       IotaBuilder(lbdInclusive, ubdExclusive)
@@ -1208,7 +1194,16 @@ package mte {
   @unused
   def 리액션(expr: Expr, template: String = "%s"): Expr = ops.makePrintExpr(expr, template)
 
+  /**
+   * 새로운 클래스를 정의하는 문법이다 맨이야~
+   * 문법: "id" 하는 플레이보이 예전에 (members) 같은데 이제 (method definition) 하는갑지 돈좀버냐?? 개노잼 노라라??
+   * @param id 새로운 타입의 이름
+   */
   case class TypeEBuilder(id: StringID) {
+    /**
+     * 새로운 클래스를 정의하는 문법이다 맨이야~
+     * 문법: "id" 하는 플레이보이 예전에 (members) 같은데 이제 (method definition) 하는갑지 돈좀버냐?? 개노잼 노라라??
+     */
     @unused
     def 하는(@unused x: 플레이보이.type): TypeEBuilder2 = TypeEBuilder2(id)
 
@@ -1243,7 +1238,7 @@ package mte {
 
     case class TypeEBuilder6(id: StringID, memberName: Vector[StringID], methods: Map[VarID, Expr]) {
       @unused
-      def 노라라(@unused x: EndState2): TypeDef = TypeDef(memberName, methods, id)
+      def 노라라(@unused x: EndState2): ClassDefFragment = ClassDefFragment(memberName, methods, id)
     }
   }
 
@@ -1296,6 +1291,14 @@ package mte {
 
   private case class TypeEMethodBuilderFinal(methodName: VarID, arg: Vector[VarID], fExpr: Expr)
 
+  implicit def methodToFragment(x: TypeEMethodBuilderFinal): CodeFragment = x.methodName match {
+    case id@StringID(_) => ValDefFragment(id, Fun(id, x.arg, x.fExpr))
+    case _ => throw mte.error.MteSyntaxErr(
+      s"얘! 지금 메서드가 아닌 함수 이름 꼬라지(${x.methodName}) 이게 뭐니!!"
+    )
+  }
+
+
   implicit class TypeEMethodBuilderFromString(id: String) extends TypeEMethodBuilder1(StringID(id))
   implicit class TypeEMethodBuilderFromID(id: VarID) extends TypeEMethodBuilder1(id)
 
@@ -1315,8 +1318,8 @@ package mte {
   case object 사랑해
 
   implicit class ProjBuilderFromExpr(expr: Expr) extends ProjBuilder(expr)
-  implicit class ProjBuilderFromId(id: String) extends ProjBuilder(id)
-  implicit class ProjBuilderFromInt(n: Int) extends ProjBuilder(n)
+  implicit class ProjBuilderFromId(id: String) extends ProjBuilder(Id(id))
+  implicit class ProjBuilderFromInt(n: Int) extends ProjBuilder(Num(n))
 
 
 
@@ -1374,15 +1377,17 @@ package mte {
       extends Exception(message, cause)
 
     final case class MteSyntaxErr(private val message: String = "",
-                                  private val cause: Throwable = None.orNull)
+                            private val cause: Throwable = None.orNull)
       extends Exception(message, cause)
 
     final case class MteUnexpectedErr(private val message: String = "",
                                   private val cause: Throwable = None.orNull)
       extends Exception(message, cause)
+
+
   }
 
-  package stl {
+  package predef {
 
   }
 }
