@@ -145,17 +145,17 @@ package mte {
   }
 
   private case class VecV(data: Vector[Value]) extends FOV {
-    override def toString: String = data.toString()
+    override def toString: String = s"한줄서기(${data.toString.drop(7).dropRight(1)})"
   }
 
   private case class HMapV(data: Map[Value, Value]) extends FOV {
     override def toString: String = data.toString()
   }
 
-  private case class ClassV(memberName: Vector[StringID],
+  private case class ClassV(memberNames: Vector[StringID],
                             methods: Map[VarID, Value],
                             typeName: StringID,
-                            cEnv: Env) extends NFOV {
+                            var cEnv: Env) extends NFOV {
     def makeMethodOf(obj: ObjV, methodName: VarID): Value = methods.get(methodName) match {
       case Some(value) => value match {
         case fn@CloV(_, _, _) =>
@@ -171,13 +171,13 @@ package mte {
       )
     }
 
-    def construct(memberValues: Vector[Value]): ObjV = if (memberName.length == memberValues.length) {
-      ObjV(memberName.zip(memberValues).toMap, supertype=this)
+    def construct(memberValues: Vector[Value]): ObjV = if (memberNames.length == memberValues.length) {
+      ObjV(memberNames.zip(memberValues).toMap, supertype=this)
     } else throw error.MteRuntimeErr(
-      s"얘! 지금 멤버 ${memberName.length}개짜리 코객체 만드는 데 값을 ${memberValues.length}개 줘서 되겠니??"
+      s"얘! 지금 멤버 ${memberNames.length}개짜리 코객체 만드는 데 값을 ${memberValues.length}개 줘서 되겠니??"
     )
 
-    override def decay: FOV = ???
+    override def decay: FOV = CloV(memberNames, App(Id(typeName), memberNames.map(x => Id(x))), cEnv)
 
     override def toString: String = s"코괴물(${typeName.id})"
   }
@@ -311,9 +311,11 @@ package mte {
         if (env.contains(typeName)) throw error.MteRuntimeErr(
           s"얘! 이미 사용하고 있는 변수명은 코괴물 이름이 되지 아내!"
         )
-        pret(next, env + (typeName -> ClassV(
+        val newClass = ClassV(
           memberName, methods.map((key, value) => (key, pret(value, env))), typeName, env
-        )))
+        )
+        newClass.cEnv += (typeName -> newClass)
+        pret(next, env + (typeName -> newClass))
       case BuiltinFnE2E(fn, arg, _) => pret(fn(arg), env)
     }
   }

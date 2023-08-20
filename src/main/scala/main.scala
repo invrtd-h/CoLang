@@ -6,6 +6,7 @@ import scala.annotation.unused
 def main(): Unit = {
   val vd: TestValidator = TestValidator()
   vd.validate(test1)
+  vd.validate(test2)
   vd.validate(test3)
   vd.validate(test5)
   vd.validate(test6)
@@ -27,6 +28,14 @@ def test1(): Unit = {
       "팩토리얼"아 4 먹어라?? 코 24 꼽표~~,
       "팩토리얼"아 8 먹어라?? 코 40320 꼽표~~
     )
+  )
+}
+
+def test2(): Unit = {
+  // class definition decay test
+  춘잣! (
+    "래퍼" 하는 플레이보이 예전에 "뭉" 하더놈 같은데 이제 스키비야 하는갑지 돈좀버냐?? 개노잼 노라라??,
+    한줄서기(1, 2, 3, 4, 5) 즐기면서가자 "래퍼" 리액션 "%s\n"
   )
 }
 
