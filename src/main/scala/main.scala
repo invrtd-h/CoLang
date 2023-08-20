@@ -4,9 +4,8 @@ import scala.annotation.unused
 
 @main
 def main(): Unit = {
-  팩토리얼()
-
   val vd: TestValidator = TestValidator()
+  vd.validate(test1)
   vd.validate(test3)
   vd.validate(test5)
   vd.validate(test6)
@@ -14,6 +13,21 @@ def main(): Unit = {
   vd.validate(test8)
   vd.validate(test9)
   vd.validate(test10)
+}
+
+def test1(): Unit = {
+  춘잣! (
+    "팩토리얼" 중에는!! 아무리 "뭉"이라도 (
+      (유링게슝한?) ("뭉" 돈 탱 원에??) (
+        "팩토리얼"아 ("뭉" 코 뭉) 먹어라?? 조이고 "뭉"
+      ) 안유링게슝 뭉
+    ) 할 수가 없단다!!,
+    정품 맞어 (
+      "팩토리얼"아 1 먹어라?? 코 1 꼽표~~,
+      "팩토리얼"아 4 먹어라?? 코 24 꼽표~~,
+      "팩토리얼"아 8 먹어라?? 코 40320 꼽표~~
+    )
+  )
 }
 
 def ㄴ찍기(): Unit = {
@@ -39,21 +53,6 @@ def test3(): Unit = {
     } 를 했대,
     정품 맞어 {
       "함수"야 (1, 2, 3) 먹어라?? 꼽표~~
-    }
-  )
-}
-
-def 팩토리얼(): Unit = {
-  춘잣! (
-    아~! ("팩토리얼", "x") 는 {
-      (유링게슝한?) ("x" 돈 탱 원에??) {
-        "팩토리얼"아 ("x" 코 뭉) 먹어라?? 조이고 "x"
-      } 안유링게슝 {
-        뭉
-      }
-    } 가 참 좋구나~!,
-    (11수) ("영양제") {
-      "팩토리얼"아 "영양제" 먹어라?? 리액션 "%s\n"
     }
   )
 }

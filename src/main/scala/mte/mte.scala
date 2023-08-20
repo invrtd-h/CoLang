@@ -1289,6 +1289,14 @@ package mte {
 
   private case class TypeEMethodBuilderFinal(methodName: VarID, arg: Vector[VarID], fExpr: Expr)
 
+  implicit def methodToFragment(x: TypeEMethodBuilderFinal): CodeFragment = x.methodName match {
+    case id@StringID(_) => ValDefFragment(id, Fun(id, x.arg, x.fExpr))
+    case _ => throw mte.error.MteSyntaxErr(
+      s"얘! 지금 메서드가 아닌 함수 이름 꼬라지(${x.methodName}) 이게 뭐니!!"
+    )
+  }
+
+
   implicit class TypeEMethodBuilderFromString(id: String) extends TypeEMethodBuilder1(StringID(id))
   implicit class TypeEMethodBuilderFromID(id: VarID) extends TypeEMethodBuilder1(id)
 
