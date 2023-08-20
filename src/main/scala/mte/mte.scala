@@ -424,7 +424,7 @@ package mte {
       def vecIota(lbdInclusive: => Value, ubdExclusive: => Value): Either[String, Value] = {
         lbdInclusive match {
           case NumV(l) => ubdExclusive match {
-            case NumV(u) => Right(VecV((l.toInt to u.toInt).map(value => NumV(value)).toVector))
+            case NumV(u) => Right(VecV((l.toInt until u.toInt).map(value => NumV(value)).toVector))
             case _ => Left(s"얘! 지금 $ubdExclusive 이게 숫자로 보이니??")
           }
           case _ => Left(s"얘! 지금 $lbdInclusive 이게 숫자로 보이니??")
@@ -619,8 +619,10 @@ package mte {
 
   implicit def exprToFragment(expr: Expr): CodeFragment = CodeFragmentGeneral(expr)
   implicit def strToId(id: String): Expr = Id(id)
+  implicit def varIDToId(id: VarID): Expr = Id(id)
   implicit def intToNum(num: Int): Expr = Num(num)
   implicit def toIdFrag(name: String): CodeFragment = CodeFragmentGeneral(Id(name))
+  implicit def varIDToIDFrag(id: VarID): CodeFragment = CodeFragmentGeneral(Id(id))
   implicit def toNumFrag(num: Int): CodeFragment = CodeFragmentGeneral(Num(num))
 
   class ExprOps(lhs: Expr) {
@@ -647,6 +649,7 @@ package mte {
 
   implicit class ExprOpsExtByExpr(lhs: Expr) extends ExprOps(lhs)
   implicit class ExprOpsExtByStr(lhs: String) extends ExprOps(Id(lhs))
+  implicit class ExprOpsExtByVarID(lhs: VarID) extends ExprOps(Id(lhs))
   implicit class ExprOpsExtByNum(lhs: Int) extends ExprOps(Num(lhs))
 
   private class EndState
@@ -814,46 +817,6 @@ package mte {
 
   case object 했대
 
-  /**
-   * 함수를 정의한단다. 함수 리터럴이라 다른 함수에 인자로 넘겨줄 수도 있고 정의한 즉시 쓸 수도 있어요~
-   * 람다 함수 만들 때 쓰는 가벼운 표현을 하나 더 만들 계획이다 맨이야
-   * 문법: 아~! (("fnName", "argName") / ("argName"))은/는 (expr)이/가 참 좋구나~!
-   */
-  case object 아 {
-    @unused
-    @targetName("notFact")
-    def ~!(funName: String, argName: String*): FunBuilder =
-      FunBuilder(StringID(funName), argName.toVector.map(StringID.apply))
-
-    case class FunBuilder(funName: StringID, argName: Vector[VarID]) {
-      @unused
-      def 는(fExpr: CodeFragment*): FunBuilder2 =
-        FunBuilder2(funName, argName, joinFragments(fExpr.toVector))
-
-      @unused
-      def 은(fExpr: CodeFragment*): FunBuilder2 =
-        FunBuilder2(funName, argName, joinFragments(fExpr.toVector))
-    }
-
-    case class FunBuilder2(funName: StringID, argName: Vector[VarID], fExpr: Expr) {
-      @unused
-      def 이(@unused x: 참.type): FunBuilder3 =
-        FunBuilder3(funName, argName, fExpr)
-
-      @unused
-      def 가(@unused x: 참.type): FunBuilder3 =
-        FunBuilder3(funName, argName, fExpr)
-    }
-
-    case class FunBuilder3(funName: StringID, argName: Vector[VarID], fExpr: Expr) {
-      @unused
-      def 좋구나(@unused x: EndState): CodeFragment =
-        ValDefFragment(funName, Fun(funName, argName, fExpr))
-    }
-  }
-
-  case object 참
-
   class LambdaBuilder(argIds: Vector[StringID]) {
     @unused
     def 은(fnExpr: Expr): LambdaBuilder2 = LambdaBuilder2(argIds, fnExpr)
@@ -883,6 +846,45 @@ package mte {
     case _ => throw error.MteSyntaxErr(s"얘! 지금 $argIds 이게 변수명으로 보이니?!?!")
   })
   implicit class LambdaBuilderFromStr(argName: String) extends LambdaBuilder(Vector(StringID(argName)))
+
+  val 아이고난1 = AnonArg(1)
+  val 아이고난2 = AnonArg(2)
+  val 아이고난3 = AnonArg(3)
+  val 아이고난4 = AnonArg(4)
+
+  @unused
+  case object 아이고난 {
+    @unused
+    @targetName("factFact")
+    def !!(expr: Expr): Expr = {
+      def max(x: Int, y: Int): Int = math.max(x, y)
+
+      def analysis(expr: Expr): Int = expr match {
+        case BinaryOp(lhs, rhs, _, _) => max(analysis(lhs), analysis(rhs))
+        case TernaryOp(x, y, z, _, _) => max(analysis(x), max(analysis(y), analysis(z)))
+        case Id(name) => name match {
+          case AnonArg(argIdx) => argIdx
+          case _ => 0
+        }
+        case ValDef(_, initExpr, next) => max(analysis(initExpr), analysis(next))
+        case Fun(_, _, fExpr) => analysis(fExpr)
+        case App(fnExpr, argExpr) => max(analysis(fnExpr), argExpr.map(analysis).reduce(max))
+        case Seq(lhs, rhs) => max(analysis(lhs), analysis(rhs))
+        case WhileN0(cond, exprIn) => max(analysis(cond), analysis(exprIn))
+        case Proj(obj, _) => analysis(obj)
+        case BoxDef(_, initExpr, next) => max(analysis(initExpr), analysis(next))
+        case SetBox(box, setExpr) => max(analysis(box), analysis(setExpr))
+        case Vec(data) => data.map(analysis).reduce(max)
+        case HMap(data) => data.map((key, value) => max(analysis(key), analysis(value))).reduce(max)
+        case ClassDef(_, methods, _, next) => max(methods.values.map(analysis).reduce(max), analysis(next))
+        case BuiltinFnE2E(_, arg, _) => analysis(arg)
+        case _ => 0
+      }
+
+      val argNames = Vector(아이고난1, 아이고난2, 아이고난3, 아이고난4)
+      Fun(AnonFn1, argNames.take(analysis(expr)), expr)
+    }
+  }
 
   /**
    * 케인인님 함수호출 한판해요
@@ -1268,10 +1270,12 @@ package mte {
 
     case class TypeEMethodBuilder3(methodName: VarID, arg: Vector[VarID]) {
       @unused
-      def 라도(fExpr: Expr): TypeEMethodBuilder4 = TypeEMethodBuilder4(methodName, arg, fExpr)
+      def 라도(fragments: CodeFragment*): TypeEMethodBuilder4 = 
+        TypeEMethodBuilder4(methodName, arg, joinFragments(fragments.toVector))
 
       @unused
-      def 이라도(fExpr: Expr): TypeEMethodBuilder4 = TypeEMethodBuilder4(methodName, arg, fExpr)
+      def 이라도(fragments: CodeFragment*): TypeEMethodBuilder4 = 
+        TypeEMethodBuilder4(methodName, arg, joinFragments(fragments.toVector))
     }
 
     case class TypeEMethodBuilder4(methodName: VarID, arg: Vector[VarID], fExpr: Expr) {
