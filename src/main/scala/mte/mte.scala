@@ -3,7 +3,7 @@ package mte {
   import scala.language.implicitConversions
   import scala.util.Random
   import scala.util.chaining.*
-  import utility.Piper
+  import utility.{Piper, mteName}
 
   sealed trait Expr
 
@@ -31,6 +31,11 @@ package mte {
 
   sealed trait Type
   case object NumT extends Type
+  case class FnT(args: Vector[Type], ret: Type) extends Type
+  case class BoxT(t: Type) extends Type
+  case class IdT(id: String) extends Type
+
+  case class TEnv(vars: Map[String, Type], typeIds: Map[String, Type]) extends Type
 
   sealed trait VarID
   case class StringID(id: String) extends VarID {
@@ -39,15 +44,16 @@ package mte {
   private case object ThisKW extends VarID
   private case object AnonFn1 extends VarID
   private case class AnonArg(argIdx: Int) extends VarID
+  private case object FnCallOp extends VarID
 
   case class VarIDImplicit(id: VarID)
   implicit class VarIDImplicitFromVarID(id: VarID) extends VarIDImplicit(id)
   implicit class VarIDImplicitFromStr(id: String) extends VarIDImplicit(StringID(id))
 
   type Env = Map[VarID, Value]
-  type Addr = Int
 
   // Expressions
+  @unused
   case class Num(data: BigInt) extends Expr {
     @unused
     @targetName("plusPlus")
@@ -55,8 +61,6 @@ package mte {
 
     override def toString: String = data.toString
   }
-
-  case class NewValue(value: FOV) extends Expr
 
   case class UnitE() extends Expr {
     override def toString: String = "unit"
@@ -86,7 +90,10 @@ package mte {
     }
   }
 
-  private case class ValDef(valName: StringID, initExpr: Expr, next: Expr) extends Expr
+  private case class ValDef(valName: StringID, initExpr: Expr, next: Expr) extends Expr {
+    override def toString: String =
+      s"ValDef(변수명:$valName, 초기치:$initExpr, 계속:$next)"
+  }
 
   private case class Fun(funName: VarID, argName: Vector[VarID], fExpr: Expr) extends Expr
 
@@ -94,7 +101,7 @@ package mte {
     override def toString: String = s"App($fnExpr, ${argExpr.toString.drop(7).dropRight(1)})"
   }
 
-  private case class Seq(lhs: Expr, rhs: Expr) extends Expr
+  private case class Seqn(lhs: Expr, rhs: Expr) extends Expr
 
   private case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
@@ -111,7 +118,10 @@ package mte {
   private case class ClassDef(memberName: Vector[StringID],
                               methods: Map[VarID, Expr],
                               typeName: StringID,
-                              next: Expr) extends Expr
+                              next: Expr) extends Expr {
+    override def toString: String =
+      s"ClassDef(이름:$typeName, 인자:[${mteName(memberName)}], 메서드:[${mteName(methods)}], 계속:$next)"
+  }
 
   private case class BuiltinFnE2E(fn: Expr => Expr, arg: Expr, opName: String) extends Expr {
     override def toString: String = s"BF<$opName>($arg)"
@@ -132,7 +142,7 @@ package mte {
   }
 
   private case class CloV(argName: Vector[VarID], fExpr: Expr, var fEnv: Env) extends FOV {
-    override def toString: String = s"함수(인자:[${argName.toString.drop(7).dropRight(1)}], 본문:[$fExpr])"
+    override def toString: String = s"함수(인자:[${argName.toString.drop(7).dropRight(1)}])"
 
     def call(arg: Vector[Value]): Value = {
       if (argName.length != arg.length) {
@@ -156,11 +166,11 @@ package mte {
                             methods: Map[VarID, Value],
                             typeName: StringID,
                             var cEnv: Env) extends NFOV {
-    def makeMethodOf(obj: ObjV, methodName: VarID): Value = methods.get(methodName) match {
+    def makeMethodOf(obj: ObjV, methodName: VarID): CloV = methods.get(methodName) match {
       case Some(value) => value match {
         case fn@CloV(_, _, _) =>
-          fn.fEnv += (ThisKW -> obj)
-          fn.fEnv += (typeName -> this)
+          fn.fEnv ++= Map(ThisKW -> obj, typeName -> this)
+          fn.fEnv ++= obj.data
           fn
         case _ => throw error.MteRuntimeErr(
           s"얘! 메소드 정의($value)가 틀려먹었단다! 고통스럽게 죽도록 해요~"
@@ -185,14 +195,14 @@ package mte {
   private case class ObjV(data: Map[StringID, Value],
                           supertype: ClassV) extends FOV {
     override def toString: String =
-      s"${supertype.typeName.id}(${data.toString().drop(4).dropRight(1)})"
+      s"${supertype.typeName.id}(${mteName(data)})"
   }
 
   /**
    * @param data 데이터의 변경 과정을 기록해놓음
    * @param addr 현재 박스가 데이터의 총 변경 과정 중 몇 번째 원소에 해당하는 값을 갖고 있는지
    */
-  case class BoxV(var data: Vector[Value], var addr: Addr) extends NFOV {
+  case class BoxV(var data: Vector[Value], var addr: Int) extends NFOV {
     def get: Value = data(addr)
 
     def set(newData: Value): Unit = {
@@ -210,6 +220,24 @@ package mte {
 
   def makeNewBox(value: Value): BoxV = BoxV(Vector(value), 0)
 
+  /*
+  *
+  * 여기서부터 인터프리터 구현 시작
+  *
+  */
+
+  /**
+   * 타입체크를 한 뒤 코드를 실행한다 맨이야
+   * @param expr 실행할 프로그램 트리
+   * @return 프로그램의 결과
+   */
+  def run(expr: Expr): Value = {
+    staticCheck(expr, TEnv(Map(), Map()))
+    pret(expr, Map())
+  }
+
+  def staticCheck(expr: Expr, tEnv: TEnv): Boolean = true
+
   def pret(expr: Expr, env: Env): Value = {
     def validateID(id: VarID): Unit = id match {
       case StringID(id) => if (id.contains("킹") && id.contains("갓")) {
@@ -218,14 +246,17 @@ package mte {
       case _ =>
     }
 
-    def fnCall(fnExpr: Expr, argExpr: Vector[Expr]): Value = pret(fnExpr, env) match {
+    def fnCall(fnExpr: Expr, argExprs: Vector[Expr]): Value = pret(fnExpr, env) match {
       case CloV(argName, fExpr, fEnv) =>
-        if (argName.length != argExpr.length) {
+        if (argName.length != argExprs.length) {
           throw error.MteSyntaxErr()
         }
-        val argV: Vector[Value] = argExpr.map(x => pret(x, env).toFOV)
+        val argV: Vector[Value] = argExprs.map(x => pret(x, env).toFOV)
         pret(fExpr, fEnv ++ argName.zip(argV).toMap)
-      case typeV@ClassV(_, _, _, _) => typeV.construct(argExpr.map(x => pret(x, env)))
+      case typeV@ClassV(_, _, _, _) => typeV.construct(argExprs.map(x => pret(x, env)))
+      case objV@ObjV(_, supertype) => supertype.makeMethodOf(objV, FnCallOp).call(
+        argExprs.map(x => pret(x, env).toFOV)
+      )
       case err@_ => throw error.MteRuntimeErr(
         s"얘! 지금 $err 이게 함수로 보이니?"
       )
@@ -233,7 +264,6 @@ package mte {
 
     expr match {
       case Num(data) => NumV(data)
-      case NewValue(value) => value
       case UnitE() => unitV
       case BinaryOp(lhs, rhs, _, op) => op(pret(lhs, env).toFOV, pret(rhs, env).toFOV) match {
         case Left(err) => throw error.MteRuntimeErr(err + s"\nexpr: $expr")
@@ -264,7 +294,7 @@ package mte {
         ret.fEnv += (funName -> ret)
         ret
       case App(fnExpr, argExpr) => fnCall(fnExpr, argExpr)
-      case Seq(lhs, rhs) =>
+      case Seqn(lhs, rhs) =>
         pret(lhs, env); pret(rhs, env)
       case WhileN0(cond, exprIn) =>
         val check = (condExpr: Expr) => {
@@ -512,6 +542,15 @@ package mte {
 
       BinaryOp(vec, fn, "vecMap", vecMap)
     }
+
+    def makeHMapContainsExpr(hMap: Expr, v: Expr): Expr = {
+      def hMapContains(hMap: => Value, value: => Value): Either[String, Value] = hMap match {
+        case HMapV(hMap) => Right(NumV(if (hMap.contains(value)) 1 else 0))
+        case _ => Left(s"얘! 지금 $hMap 이게 뭉탱이로 보이니??")
+      }
+
+      BinaryOp(hMap, v, "hMapContains", hMapContains)
+    }
   }
 
   package ops3 {
@@ -519,11 +558,11 @@ package mte {
       def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] =
         if (cond.isTruthy) Right(yes) else Right(no)
 
-      TernaryOp(cond, yes, no, ternaryIf, "If")
+      TernaryOp(cond, yes, no, ternaryIf, "if")
     }
 
-    def makeVecUpdatedExpr(vecE: Expr, idxE: Expr, dataE: Expr): Expr = {
-      def vecUpdated(vec: => Value, idx: => Value, data: => Value): Either[String, Value] = vec match {
+    def makeUpdatedExpr(vecE: Expr, idxE: Expr, dataE: Expr): Expr = {
+      def updated(vec: => Value, idx: => Value, data: => Value): Either[String, Value] = vec match {
         case VecV(vec) => idx match {
           case NumV(idx) =>
             if (idx < 0 || idx >= vec.length)
@@ -532,10 +571,11 @@ package mte {
               Right(VecV(vec.updated(idx.toInt, data)))
           case _ => Left(s"얘! 지금 한줄서기 인덱스가 $idx 이게 숫자로 보이니??")
         }
+        case HMapV(hMap) => Right(HMapV(hMap.updated(idx, data)))
         case _ => Left(s"얘! 지금 한줄서기 인덱스 접근 문법(mte=$vec, index=$idx)에서 $vec 이게 한줄서기로 보이냐??")
       }
 
-      TernaryOp(vecE, idxE, dataE, vecUpdated, "vecUpdate")
+      TernaryOp(vecE, idxE, dataE, updated, "updated")
     }
   }
 
@@ -548,7 +588,7 @@ package mte {
       @tailrec
       def help(vec: Vector[Expr], ret: Expr): Expr = {
         if (vec.nonEmpty) {
-          help(vec.tail, Seq(ret, vec.head))
+          help(vec.tail, Seqn(ret, vec.head))
         } else {
           ret
         }
@@ -562,7 +602,7 @@ package mte {
     }
 
     def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
-      BoxDef(StringID(iterName), initExpr, WhileN0(condExpr, Seq(
+      BoxDef(StringID(iterName), initExpr, WhileN0(condExpr, Seqn(
         inExpr,
         manipulationExpr
       )))
@@ -577,6 +617,13 @@ package mte {
     )
 
   }
+
+  /*
+   * 연산자 오버로딩 를! 담당한단다.
+   */
+
+  @unused
+  def 함수호출: VarID = FnCallOp
 
   /*
   (characters not shown below)
@@ -609,7 +656,7 @@ package mte {
       }
     } else {
       fragments.head match
-        case CodeFragmentGeneral(expr) => Seq(expr, joinFragments(fragments.tail))
+        case CodeFragmentGeneral(expr) => Seqn(expr, joinFragments(fragments.tail))
         case ValDefFragment(name, expr) => ValDef(name, expr, joinFragments(fragments.tail))
         case BoxDefFragment(name, expr) => BoxDef(name, expr, joinFragments(fragments.tail))
         case ClassDefFragment(memberName, methods, id) =>
@@ -638,7 +685,7 @@ package mte {
 
     @unused def 리액션(template: String): Expr = ops.makePrintExpr(lhs, template)
 
-    @unused def 케바바바밥줘(rhs: Expr): Expr = Seq(lhs, rhs)
+    @unused def 케바바바밥줘(rhs: Expr): Expr = Seqn(lhs, rhs)
 
     @unused def 꼽표(@unused rhs: EndState3): Expr = ops.makeLogNotExpr(lhs)
 
@@ -687,7 +734,7 @@ package mte {
   case object 춘잣 {
     @targetName("fact")
     @unused
-    def !(frag: CodeFragment*): Value = pret(joinFragments(frag.toVector), Map())
+    def !(frag: CodeFragment*): Value = run(joinFragments(frag.toVector))
   }
 
   @unused
@@ -869,7 +916,7 @@ package mte {
         case ValDef(_, initExpr, next) => max(analysis(initExpr), analysis(next))
         case Fun(_, _, fExpr) => analysis(fExpr)
         case App(fnExpr, argExpr) => max(analysis(fnExpr), argExpr.map(analysis).reduce(max))
-        case Seq(lhs, rhs) => max(analysis(lhs), analysis(rhs))
+        case Seqn(lhs, rhs) => max(analysis(lhs), analysis(rhs))
         case WhileN0(cond, exprIn) => max(analysis(cond), analysis(exprIn))
         case Proj(obj, _) => analysis(obj)
         case BoxDef(_, initExpr, next) => max(analysis(initExpr), analysis(next))
@@ -1017,15 +1064,6 @@ package mte {
   @unused case object 그런
   @unused case object 순없는지
 
-  case class ArgListBuilder(argList: Vector[String]) {
-    @unused
-    @targetName("plusPlusPlus")
-    def +++(nextArgId: String): Vector[String] = argList :+ nextArgId
-  }
-
-  implicit class ArgListBuilderFromVecStr(argList: Vector[String]) extends ArgListBuilder(argList)
-  implicit class ArgListBuilderFromStr(firstArg: String) extends ArgListBuilder(Vector(firstArg))
-
   /**
    * 다변수 함수에 인자를 전달할 때 쓰는 문법을 만들었어요~
    * 문법: fnExpr 묶음!!(arg1, arg2, ...)
@@ -1039,10 +1077,6 @@ package mte {
       for (arg <- args) ret = ret :+ arg
       ret
     }
-
-    @unused
-    @targetName("factFactFactFact")
-    def !!!!(args: Expr*): Expr = sugar.vecToSeq(args.toVector)
   }
 
   /**
@@ -1138,7 +1172,7 @@ package mte {
 
     case class VecUpdateBuilder(vecE: Expr, idxE: Expr) {
       @unused
-      def 할게(rhs: VecUpdateRhsBuilder): Expr = ops3.makeVecUpdatedExpr(vecE, idxE, rhs.updateE)
+      def 할게(rhs: VecUpdateRhsBuilder): Expr = ops3.makeUpdatedExpr(vecE, idxE, rhs.updateE)
     }
 
     /**
@@ -1171,7 +1205,15 @@ package mte {
   implicit class VecOpsBuilderFromId(id: String) extends VecOpsBuilder(Id(id))
   implicit class VecOpsBuilderFromInt(num: Int) extends VecOpsBuilder(Num(num))
 
+  @unused
+  def 뭉탱이(args: (Expr, Expr)*): Expr = HMap(args.toMap)
 
+  @unused
+  case object 겸상 {
+    @unused
+    @targetName("quesQues")
+    def ??(hMap: Expr, v: Expr): Expr = ops.makeHMapContainsExpr(hMap, v)
+  }
 
   /**
    * 랜덤이 필요하면 윷놀이 를! 아침까지 조이도록 해요~
@@ -1270,11 +1312,11 @@ package mte {
 
     case class TypeEMethodBuilder3(methodName: VarID, arg: Vector[VarID]) {
       @unused
-      def 라도(fragments: CodeFragment*): TypeEMethodBuilder4 = 
+      def 라도(fragments: CodeFragment*): TypeEMethodBuilder4 =
         TypeEMethodBuilder4(methodName, arg, joinFragments(fragments.toVector))
 
       @unused
-      def 이라도(fragments: CodeFragment*): TypeEMethodBuilder4 = 
+      def 이라도(fragments: CodeFragment*): TypeEMethodBuilder4 =
         TypeEMethodBuilder4(methodName, arg, joinFragments(fragments.toVector))
     }
 
@@ -1338,6 +1380,9 @@ package mte {
       @targetName("pipe")
       def |>[G](f: F => G): G = f(value)
     }
+
+    def mteName[T](vec: Vector[T]): String = vec.toString.drop(7).dropRight(1)
+    def mteName[T, U](map: Map[T, U]): String = map.toString.drop(4).dropRight(1)
 
     /**
      *
