@@ -4,11 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="스칼라 스타일 람다 함수 문법을 추가한 나">
-      <change afterPath="$PROJECT_DIR$/src/main/scala/output.txt" afterDir="false" />
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="마이너한 버그를 수정한 나">
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/ops3/ops3.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/utility/utility.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -120,7 +121,7 @@
       <workItem from="1690942305433" duration="184000" />
       <workItem from="1690950484864" duration="2883000" />
       <workItem from="1691389465635" duration="48102000" />
-      <workItem from="1692065461486" duration="81747000" />
+      <workItem from="1692065461486" duration="82805000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -416,7 +417,14 @@
       <option name="project" value="LOCAL" />
       <updated>1692547527489</updated>
     </task>
-    <option name="localTasksCounter" value="43" />
+    <task id="LOCAL-00043" summary="마이너한 버그를 수정한 나">
+      <created>1692621001376</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1692621001376</updated>
+    </task>
+    <option name="localTasksCounter" value="44" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -458,7 +466,8 @@
     <MESSAGE value="객체 지향 구현 1단계 를! 완료한 나" />
     <MESSAGE value="env 구현에 불변성을 추가한 나" />
     <MESSAGE value="스칼라 스타일 람다 함수 문법을 추가한 나" />
-    <option name="LAST_COMMIT_MESSAGE" value="스칼라 스타일 람다 함수 문법을 추가한 나" />
+    <MESSAGE value="마이너한 버그를 수정한 나" />
+    <option name="LAST_COMMIT_MESSAGE" value="마이너한 버그를 수정한 나" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
