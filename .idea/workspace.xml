@@ -4,11 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="마이너한 버그를 수정한 나">
-      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/ops3/ops3.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/utility/utility.scala" afterDir="false" />
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="파일 분할을 한 나">
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/expr.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/ids.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/mtetype.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/pret.scala" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/value.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
     </list>
@@ -28,7 +29,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="master" />
+        <entry key="$PROJECT_DIR$" value="newBoxRule" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -121,7 +122,7 @@
       <workItem from="1690942305433" duration="184000" />
       <workItem from="1690950484864" duration="2883000" />
       <workItem from="1691389465635" duration="48102000" />
-      <workItem from="1692065461486" duration="82805000" />
+      <workItem from="1692065461486" duration="85404000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -424,7 +425,14 @@
       <option name="project" value="LOCAL" />
       <updated>1692621001376</updated>
     </task>
-    <option name="localTasksCounter" value="44" />
+    <task id="LOCAL-00044" summary="파일 분할을 한 나">
+      <created>1692622286652</created>
+      <option name="number" value="00044" />
+      <option name="presentableId" value="LOCAL-00044" />
+      <option name="project" value="LOCAL" />
+      <updated>1692622286652</updated>
+    </task>
+    <option name="localTasksCounter" value="45" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -442,7 +450,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="i" />
     <MESSAGE value="input 키워드 &quot;개입&quot; 추가" />
     <MESSAGE value="assertion 구문 추가" />
     <MESSAGE value="모든 변수가 수정 가능" />
@@ -467,7 +474,8 @@
     <MESSAGE value="env 구현에 불변성을 추가한 나" />
     <MESSAGE value="스칼라 스타일 람다 함수 문법을 추가한 나" />
     <MESSAGE value="마이너한 버그를 수정한 나" />
-    <option name="LAST_COMMIT_MESSAGE" value="마이너한 버그를 수정한 나" />
+    <MESSAGE value="파일 분할을 한 나" />
+    <option name="LAST_COMMIT_MESSAGE" value="파일 분할을 한 나" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>
