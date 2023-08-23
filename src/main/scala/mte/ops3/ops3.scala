@@ -1,6 +1,8 @@
 package mte.ops3
 
-import mte._
+import mte.*
+import mte.expr.{Expr, TernaryOp}
+import mte.value.{HMapV, NumV, Value, VecV}
 
 def makeTernaryIfExpr(cond: Expr, yes: Expr, no: Expr): Expr = {
   def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] =

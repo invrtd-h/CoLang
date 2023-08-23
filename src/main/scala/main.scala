@@ -1,4 +1,6 @@
-import mte._
+import mte.*
+import mte.mtetype.유리계수
+
 import scala.language.postfixOps
 import scala.annotation.unused
 
@@ -194,6 +196,14 @@ def test11(): Unit = {
       "다이나믹 프로그래밍"아 ("피보나치", 뭉탱이()) 먹어라??
     ) 를 했대,
     "피보나치2"야 40 먹어라?? 리액션 "%s\n"
+  )
+}
+
+def test12(): Unit = {
+  "and" |: 유리계수 >>: 유리계수
+  "xod" |: (유리계수, 유리계수) >>: 유리계수
+  춘잣! (
+    아니세상에 자기가 "뭉" |: 유리계수 라는사람인데 1 를 했대
   )
 }
 

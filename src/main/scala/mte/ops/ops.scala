@@ -2,10 +2,25 @@ package mte.ops
 
 import scala.annotation.{tailrec, targetName, unused}
 import scala.util.Right
+import mte.{expr, *}
+import mte.expr.{BinaryOp, Expr, unitE}
+import mte.mtetype.{HMapT, NumT, Type, UnitT, VecT}
+import mte.value.{CloV, HMapV, NumV, Value, VecV, unitV}
 
-import mte._
+type OpFn = (=> Value, => Value) => Either[String, Value]
+type TypeOpFn = (Type, Type) => Either[String, Type]
 
-private def liftBinaryOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) => Either[String, Value] = {
+private[mte] case class Op(op: OpFn, typeOp: TypeOpFn, name: String) {
+  def calculate(lhs: => Value, rhs: => Value): Either[String, Value] =
+    op(lhs, rhs)
+
+  def calculateType(lhs: Type, rhs: Type): Either[String, Type] =
+    typeOp(lhs, rhs)
+
+  override def toString: String = s"Op<$name>"
+}
+
+private def liftBinaryOp(op: (BigInt, BigInt) => BigInt): OpFn = {
   def ret(lhs: => Value, rhs: => Value): Either[String, Value] = {
     lhs match {
       case NumV(dataL) => rhs match {
@@ -19,7 +34,7 @@ private def liftBinaryOp(op: (BigInt, BigInt) => BigInt): (=> Value, => Value) =
   ret
 }
 
-private def liftUnaryOp(op: BigInt => BigInt): (=> Value, => Value) => Either[String, Value] = {
+private def liftUnaryOp(op: BigInt => BigInt): OpFn = {
   def ret(lhs: => Value, @unused rhs: => Value): Either[String, Value] = lhs match {
     case NumV(data) => Right(NumV(op(data)))
     case _ => Left(s"얘! 여기 지금 $lhs 이게 숫자로 보이니??")
@@ -28,22 +43,41 @@ private def liftUnaryOp(op: BigInt => BigInt): (=> Value, => Value) => Either[St
   ret
 }
 
-def makeAddExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "add", liftBinaryOp(_ + _))
-def makeSubExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "sub", liftBinaryOp(_ - _))
-def makeMulExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "mul", liftBinaryOp(_ * _))
-def makeDivExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "div", liftBinaryOp(_ / _))
-def makeGtExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "gt", liftBinaryOp(utility.gtInt))
-def makeGeExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "ge", liftBinaryOp(utility.geInt))
-def makeLogNotExpr(lhs: Expr): Expr = BinaryOp(lhs, unitE, "logNot", liftUnaryOp(utility.logNot))
-def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr = BinaryOp(lhs, rhs, "%", liftBinaryOp(_ % _))
+private def binaryTypeOp: TypeOpFn = {
+  def ret(t: Type, u: Type): Either[String, Type] = if (NumT :> t) {
+    if (NumT :> u) Right(NumT) else typeNotMatch(NumT, u)
+  } else typeNotMatch(NumT, t)
 
-def makeSqrtExpr(lhs: Expr): Expr = {
+  ret
+}
+
+def makeAddExpr(lhs: Expr, rhs: Expr): Expr =
+  BinaryOp(lhs, rhs, Op(liftBinaryOp(_ + _), binaryTypeOp, "+"))
+def makeSubExpr(lhs: Expr, rhs: Expr): Expr =
+  BinaryOp(lhs, rhs, Op(liftBinaryOp(_ - _), binaryTypeOp, "-"))
+def makeMulExpr(lhs: Expr, rhs: Expr): Expr =
+  BinaryOp(lhs, rhs, Op(liftBinaryOp(_ * _), binaryTypeOp, "*"))
+def makeDivExpr(lhs: Expr, rhs: Expr): Expr =
+  BinaryOp(lhs, rhs, Op(liftBinaryOp(_ / _), binaryTypeOp, "/"))
+def makeGtExpr(lhs: Expr, rhs: Expr): Expr =
+  BinaryOp(lhs, rhs, Op(liftBinaryOp(utility.gtInt), binaryTypeOp, ">"))
+def makeGeExpr(lhs: Expr, rhs: Expr): Expr =
+  BinaryOp(lhs, rhs, Op(liftBinaryOp(utility.geInt), binaryTypeOp, ">="))
+def makeLogNotExpr(lhs: Expr): Expr =
+  BinaryOp(lhs, unitE, Op(liftUnaryOp(utility.logNot), binaryTypeOp, "!"))
+def makeRemainderExpr(lhs: Expr, rhs: Expr): Expr =
+  BinaryOp(lhs, rhs, Op(liftBinaryOp(_ % _), binaryTypeOp, "%"))
+
+private[mte] def makeSqrtExpr(lhs: Expr): Expr = {
   def sqrt(value: => Value, @unused x: => Value): Either[String, Value] = value match {
     case NumV(data) => Right(NumV(math.sqrt(data.doubleValue).floor.toLong))
     case _ => Left(s"얘! 지금 $value 이게 숫자로 보이니??")
   }
 
-  BinaryOp(lhs, unitE, "sqrt", sqrt)
+  def sqrtT(t: Type, @unused x: Type): Either[String, Type] =
+    if (NumT :> t) Right(NumT) else typeNotMatch(NumT, t)
+
+  BinaryOp(lhs, unitE, Op(sqrt, sqrtT, "sqrt"))
 }
 
 def makePrintExpr(x: Expr, template: String): Expr = {
@@ -52,7 +86,9 @@ def makePrintExpr(x: Expr, template: String): Expr = {
     Right(x)
   }
 
-  BinaryOp(x, unitE, "print", ret)
+  def retT(t: Type, @unused y: Type): Either[String, Type] = Right(t)
+
+  BinaryOp(x, unitE, Op(ret, retT, "print"))
 }
 
 def makeAssertExpr(value: Expr): Expr = {
@@ -61,11 +97,16 @@ def makeAssertExpr(value: Expr): Expr = {
       if (data != 0)
         Right(unitV)
       else
-        Left(s"얘! 지금 네 눈에 $value 이게 truthy한 값이 되겠니??")
+        throw error.MteAssertionFailedException(s"얘! 지금 네 눈에 $value 이게 truthy한 값이 되겠니??")
     case _ => Left(s"얘! 지금 네 눈에 $value 이게 true/false가 되는 타입이 되겠니??")
   }
 
-  BinaryOp(value, unitE, "assert", myAssert)
+  def myAssertT(t: Type, @unused u: Type): Either[String, Type] = t match {
+    case NumT => Right(UnitT)
+    case _ => Left(s"얘! 지금 네 눈에 $value 이게 true/false가 되는 타입이 되겠니??")
+  }
+
+  BinaryOp(value, unitE, Op(myAssert, myAssertT, "assert"))
 }
 
 def makeAccessExpr(lhs: Expr, rhs: Expr): Expr = {
@@ -80,12 +121,21 @@ def makeAccessExpr(lhs: Expr, rhs: Expr): Expr = {
     }
     case HMapV(data) => data.get(idx) match {
       case Some(value) => Right(value)
-      case None => Left(s"얘! 뭉탱이($data)는 $idx 이런 거 몰라 임마!!")
+      case None => Left(s"얘! ${data}는 $idx 이런 거 몰라 임마!!")
     }
     case _ => Left(s"얘! 지금 인덱스 접근 문법(mte=$container, index=$idx)에서 $container 이게 컨테이너가 되겠니??")
   }
 
-  BinaryOp(lhs, rhs, "access", access)
+  def accessT(t: Type, u: Type): Either[String, Type] = t match {
+    case VecT(t) => u match {
+      case NumT => Right(t)
+      case _ => Left(s"얘! 지금 한줄서기 인덱스가 $u 이게 유리계수 타입으로 보이니??")
+    }
+    case HMapT(k, v) => if (k :> u) Right(v) else Left(s"얘! 지금 ${u}가 ${k}인 걸로 보이니??")
+    case _ => Left(s"얘! 지금 $t 이게 컨테이너가 되겠니??")
+  }
+
+  BinaryOp(lhs, rhs, Op(access, accessT, "access"))
 }
 
 def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = {
@@ -96,7 +146,9 @@ def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = {
     case _ => Left(s"얘! 지금 나보고 ${size}개의 원소를 가진 벡터를 만들어 달라고 하면 어쩌자는 거니!")
   }
 
-  BinaryOp(sizeE, initE, "vecFill", vecFill)
+  def vecFillT(t: Type, u: Type): Either[String, Type] = if (NumT :> t) Right(VecT(u)) else typeNotMatch(NumT, t)
+
+  BinaryOp(sizeE, initE, Op(vecFill, vecFillT, "vecFill"))
 }
 
 def makeVecIotaExpr(lbdInclusive: Expr, ubdExclusive: Expr): Expr = {
@@ -110,11 +162,13 @@ def makeVecIotaExpr(lbdInclusive: Expr, ubdExclusive: Expr): Expr = {
     }
   }
 
-  BinaryOp(lbdInclusive, ubdExclusive, "vecIota", vecIota)
+  def vecIotaT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(lbdInclusive, ubdExclusive, Op(vecIota, vecIotaT, "vecIota"))
 }
 
 def makeExtExpr(lhs: Expr, rhs: Expr): Expr = {
-  def extension(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
+  def ext(lhs: => Value, rhs: => Value): Either[String, Value] = lhs match {
     case VecV(lData) => rhs match {
       case VecV(rData) => Right(VecV(lData ++ rData))
       case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $rhs 이게 한줄서기로 보이냐??")
@@ -126,17 +180,21 @@ def makeExtExpr(lhs: Expr, rhs: Expr): Expr = {
     case _ => Left(s"얘! 지금 한줄서기 연결 문법(lhs=$lhs, rhs=$rhs)에서 $lhs 이게 컨테이너로 보이냐??")
   }
 
-  BinaryOp(lhs, rhs, "ext", extension)
+  def extT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(lhs, rhs, Op(ext, extT, "ext"))
 }
 
 def makeSizeExpr(lhs: Expr, rhs: Expr): Expr = {
-  def containerSize(vec: => Value, @unused x: => Value): Either[String, Value] = vec match {
+  def size(vec: => Value, @unused x: => Value): Either[String, Value] = vec match {
     case VecV(data) => Right(NumV(data.length))
     case HMapV(data) => Right(NumV(data.size))
     case _ => Left(s"얘! 지금 $vec 이게 컨테이너로 보이냐??")
   }
 
-  BinaryOp(lhs, rhs, "size", containerSize)
+  def sizeT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(lhs, rhs, Op(size, sizeT, "size"))
 }
 
 def makeVecDropRightExpr(vecE: Expr, dropNumE: Expr): Expr = {
@@ -153,7 +211,9 @@ def makeVecDropRightExpr(vecE: Expr, dropNumE: Expr): Expr = {
     case _ => Left(s"얘! 지금 $vec 이게 한줄서기로 보이냐??")
   }
 
-  BinaryOp(vecE, dropNumE, "vecDropRight", vecDropRight)
+  def vecDropRightT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(vecE, dropNumE, Op(vecDropRight, vecDropRightT, "vecDropRight"))
 }
 
 def makeVecFilterExpr(vec: Expr, fn: Expr): Expr = {
@@ -165,7 +225,9 @@ def makeVecFilterExpr(vec: Expr, fn: Expr): Expr = {
     case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
   }
 
-  BinaryOp(vec, fn, "vecFilter", vecFilter)
+  def vecFilterT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(vec, fn, Op(vecFilter, vecFilterT, "vecFilter"))
 }
 
 def makeVecRejectExpr(vec: Expr, fn: Expr): Expr = {
@@ -177,7 +239,9 @@ def makeVecRejectExpr(vec: Expr, fn: Expr): Expr = {
     case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
   }
 
-  BinaryOp(vec, fn, "vecReject", vecReject)
+  def vecRejectT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(vec, fn, Op(vecReject, vecRejectT, "vecReject"))
 }
 
 def makeVecMapExpr(vec: Expr, fn: Expr): Expr = {
@@ -189,7 +253,9 @@ def makeVecMapExpr(vec: Expr, fn: Expr): Expr = {
     case _ => Left(s"얘! 지금 $vec 이게 벡터로 보이니??")
   }
 
-  BinaryOp(vec, fn, "vecMap", vecMap)
+  def vecMapT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(vec, fn, Op(vecMap, vecMapT, "vecMap"))
 }
 
 def makeHMapContainsExpr(hMap: Expr, v: Expr): Expr = {
@@ -198,5 +264,10 @@ def makeHMapContainsExpr(hMap: Expr, v: Expr): Expr = {
     case _ => Left(s"얘! 지금 $hMap 이게 뭉탱이로 보이니??")
   }
 
-  BinaryOp(hMap, v, "hMapContains", hMapContains)
+  def hMapContainsT(t: Type, u: Type): Either[String, Type] = ???
+
+  BinaryOp(hMap, v, Op(hMapContains, hMapContainsT, "hMapContains"))
 }
+
+private def typeNotMatch(supertype: Type, subtype: Type): Either[String, Type] =
+  Left(s"얘! 여기 지금 $subtype 이게 ${supertype}(으)로 보이니??")

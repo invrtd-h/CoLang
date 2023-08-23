@@ -11,8 +11,18 @@ implicit class Piper[F](val value: F) {
   def |>[G](f: F => G): G = f(value)
 }
 
-def mteName[T](vec: Vector[T]): String = vec.toString.drop(7).dropRight(1)
-def mteName[T, U](map: Map[T, U]): String = map.toString.drop(4).dropRight(1)
+package strcut {
+  case class StrCut(s: String, l: Int, r: Int) {
+    def cut: String = {
+      val t: String = s.dropRight(r)
+      t.substring(l)
+    }
+  }
+
+  implicit class StrCutFromVec[T](s: Vector[T]) extends StrCut(s.toString(), 7, 1)
+
+  implicit class StrCutFromMap[K, V](s: Map[K, V]) extends StrCut(s.toString(), 4, 1)
+}
 
 /**
  *
@@ -42,5 +52,6 @@ def geInt(lhs: BigInt, rhs: BigInt): BigInt =
 def logNot(lhs: BigInt): BigInt =
   if (lhs == 0) 1 else 0
 
+@unused
 def maxInt(lhs: BigInt, rhs: BigInt): BigInt =
   if (lhs > rhs) lhs else rhs
