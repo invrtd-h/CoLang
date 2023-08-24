@@ -9,7 +9,6 @@ type Cont = Value => TailRec[Value]
 
 def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
   case Num(data) => tailcall(cont(NumV(data)))
-  case UnitE() => tailcall(cont(UnitV()))
   case BinaryOp(lhs, rhs, op) => tailcall(
     pret(lhs, env, x => tailcall(
       pret(rhs, env, y => tailcall(

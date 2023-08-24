@@ -1,5 +1,4 @@
 import mte.*
-import mte.mtetype.유리계수
 
 import scala.language.postfixOps
 import scala.annotation.unused
@@ -37,7 +36,7 @@ def test1(): Unit = {
 def test2(): Unit = {
   // class definition decay test
   춘잣! (
-    "래퍼" 하는 플레이보이 예전에 "뭉" 하더놈 같은데 이제 스키비야 하는갑지 돈좀버냐?? 개노잼 노라라??,
+    "래퍼" 하는 플레이보이 예전에 "뭉" 하더놈 같은데 이제 스킵 하는갑지 돈좀버냐?? 개노잼 노라라??,
     뭐 드시냐고 5 번째 물어봅니다 즐기면서가자 "래퍼" 리액션 "%s\n"
   )
 }

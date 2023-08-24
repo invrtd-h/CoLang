@@ -3,7 +3,7 @@ package mte.pret
 import mte.expr._
 import mte.value._
 import mte.ids._
-import mte.mtetype.TEnv
+import mte.mtetype._
 import mte.error._
 
 /**
@@ -17,7 +17,9 @@ private[mte] def run(expr: Expr): Value = {
   pret(expr, Map())
 }
 
-private def staticCheck(expr: Expr, tEnv: TEnv): Boolean = true
+private def staticCheck(expr: Expr, tEnv: TEnv): Type = {
+  NumT
+}
 
 private[mte] def pret(expr: Expr, env: Env): Value = {
   def validateID(id: VarID): Unit = id match {
@@ -45,7 +47,7 @@ private[mte] def pret(expr: Expr, env: Env): Value = {
 
   expr match {
     case Num(data) => NumV(data)
-    case UnitE() => unitV
+    case StrE(data) => StrV(data)
     case BinaryOp(lhs, rhs, op) => op.calculate(pret(lhs, env).toFOV, pret(rhs, env).toFOV) match {
       case Left(err) => throw MteRuntimeErr(err + s"\nexpr: $expr")
       case Right(value) => value
@@ -75,6 +77,7 @@ private[mte] def pret(expr: Expr, env: Env): Value = {
       ret.fEnv += (funName -> ret)
       ret
     case App(fnExpr, argExpr) => fnCall(fnExpr, argExpr)
+    case Tuple(data, _) => TupleV(data.map(x => pret(x, env)))
     case Seqn(lhs, rhs) =>
       pret(lhs, env); pret(rhs, env)
     case WhileN0(cond, exprIn) =>
@@ -127,6 +130,5 @@ private[mte] def pret(expr: Expr, env: Env): Value = {
       )
       newClass.cEnv += (typeName -> newClass)
       pret(next, env + (typeName -> newClass))
-    case BuiltinFnE2E(fn, arg, _) => pret(fn(arg), env)
   }
 }

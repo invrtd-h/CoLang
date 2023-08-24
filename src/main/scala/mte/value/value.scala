@@ -31,12 +31,6 @@ private[mte] sealed trait NFOV extends Value {
   def decay: FOV
 }
 
-case class UnitV() extends FOV {
-  override def toString: String = "UnitV"
-}
-
-private[mte] val unitV: UnitV = UnitV()
-
 private[mte] case class NumV(data: BigInt) extends FOV {
   override def toString: String = "%s".format(data)
 }
@@ -60,6 +54,8 @@ private[mte] case class CloV(argName: Vector[VarID], fExpr: Expr, var fEnv: Env)
 
 private[mte] case class TupleV(data: Vector[Value]) extends FOV
 
+private[mte] val unitV: Value = TupleV(Vector())
+
 private[mte] case class VecV(data: Vector[Value]) extends FOV {
   override def toString: String = s"한줄서기(${data.cut})"
 }
@@ -68,10 +64,10 @@ private[mte] case class HMapV(data: Map[Value, Value]) extends FOV {
   override def toString: String = data.toString()
 }
 
-private[mte] case class ClassV(memberNames: Vector[StringID],
-                          methods: Map[VarID, Value],
-                          typeName: StringID,
-                          var cEnv: Env) extends NFOV {
+private[mte] case class ClassV(memberNames: Vector[StringID], 
+                               methods: Map[VarID, Value], 
+                               typeName: StringID, 
+                               var cEnv: Env) extends NFOV {
   def makeMethodOf(obj: ObjV, methodName: VarID): CloV = methods.get(methodName) match {
     case Some(value) => value match {
       case fn@CloV(_, _, _) =>
@@ -98,8 +94,8 @@ private[mte] case class ClassV(memberNames: Vector[StringID],
   override def toString: String = s"코괴물(${typeName.id})"
 }
 
-private[mte] case class ObjV(data: Map[StringID, Value],
-                        supertype: ClassV) extends FOV {
+private[mte] case class ObjV(data: Map[StringID, Value], 
+                             supertype: ClassV) extends FOV {
   override def toString: String =
     s"${supertype.typeName.id}(${data.cut})"
 }

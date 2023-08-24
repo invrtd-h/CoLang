@@ -1,14 +1,14 @@
 package mte
 
-import mte.expr.{App, BinaryOp, BoxDef, BoxSet, BuiltinFnE2E, ClassDef, Expr, Fun, HMap, Id, Num, Proj, Seqn, TernaryOp, UnitE, ValDef, Vec, WhileN0}
+import mte.expr.{App, BinaryOp, BoxDef, BoxSet, ClassDef, Expr, Fun, HMap, Id, Num, Proj, Seqn, TernaryOp, unitE, ValDef, Vec, WhileN0}
 import mte.ids.{AnonArg, AnonFn1, FnCallOp, StringID, ThisKW, VarID}
-import mte.mtetype.{ArrowT, Type, VarT}
-import mte.value.{BoxV, UnitV, Value}
+import mte.mtetype.{ArrowT, NumT, Type, VarT}
+import mte.value.{BoxV, Value}
 import mte.pret.run
 
 import scala.annotation.{tailrec, targetName, unused}
 import scala.language.implicitConversions
-import scala.util.Random
+import scala.util.{Random, Success, Try}
 import scala.util.chaining.*
 import utility.Piper
 
@@ -27,6 +27,35 @@ import scala.collection.immutable.Vector
 (all letters, $, _)
 */
 
+/**
+ * 프로그래머가 사용할 타입 노테이션을 정의한다
+ */
+private[mte] sealed trait TypeNotation {
+  def getType: Type
+
+  @unused
+  @targetName("colonColon")
+  def |:(id: String): (StringID, Type) = (StringID(id), getType)
+
+  @unused
+  @targetName("w")
+  def >>:(argTypes: TypeNotation*): TypeNotation = ArrowTNotation(argTypes.toVector, this)
+}
+
+@unused
+case object 스킵 extends TypeNotation {
+  override def getType: Type = VarT(None)
+}
+
+@unused
+case object 유리계수 extends TypeNotation {
+  override def getType: Type = NumT
+}
+
+private case class ArrowTNotation(args: Vector[TypeNotation], ret: TypeNotation) extends TypeNotation {
+  override def getType: Type = ArrowT(args.map(x => x.getType), ret.getType)
+}
+
 sealed trait CodeFragment
 
 case class CodeFragmentGeneral(expr: Expr) extends CodeFragment
@@ -43,9 +72,9 @@ def joinFragments(fragments: Vector[CodeFragment]): Expr = {
   if (fragments.length == 1) {
     fragments.head match {
       case CodeFragmentGeneral(expr) => expr
-      case ValDefFragment(name, t, expr) => ValDef(name, t, expr, UnitE())
-      case BoxDefFragment(name, t, expr) => BoxDef(name, t, expr, UnitE())
-      case ClassDefFragment(memberName, methods, id) => ClassDef(memberName, methods, id, UnitE())
+      case ValDefFragment(name, t, expr) => ValDef(name, t, expr, unitE)
+      case BoxDefFragment(name, t, expr) => BoxDef(name, t, expr, unitE)
+      case ClassDefFragment(memberName, methods, id) => ClassDef(memberName, methods, id, unitE)
     }
   } else {
     fragments.head match
@@ -133,8 +162,8 @@ private case class EndState7() extends EndState
 @unused val 뭉탱탱뭉: Num = Num(9)
 @unused val 뭉탱탱탱: Num = Num(8)
 
-@unused val 스키비야: UnitE = UnitE()
-@unused val 스킵이야: UnitE = UnitE()
+@unused val 스키비야 = unitE
+@unused val 스킵이야 = unitE
 
 @unused
 def 함수호출: VarID = FnCallOp
@@ -335,7 +364,6 @@ case object 아이고난 {
       case Vec(data, _) => data.map(analysis).reduce(max)
       case HMap(data, _, _) => data.map((key, value) => max(analysis(key), analysis(value))).reduce(max)
       case ClassDef(_, methods, _, next) => max(methods.values.map(analysis).reduce(max), analysis(next))
-      case BuiltinFnE2E(_, arg, _) => analysis(arg)
       case _ => 0
     }
 
@@ -656,7 +684,7 @@ val 윷놀이: Expr = Num(utility.randBetween(1, 6))
  * 정수 말고 다른 문자는 이따 쉬는시간에 감사하다고 할게~
  */
 @unused
-val 개입: Expr = BuiltinFnE2E(readInt, UnitE(), "readInt")
+val 개입: Expr = ops.makeReadIntExpr
 
 /**
  * 나는! 나는! 나는! stdout으로 출력을 했다!
@@ -703,7 +731,7 @@ case class TypeEBuilder(id: StringID) {
     }
 
     @unused
-    def 이제(@unused x: UnitE): TypeEBuilder5 = TypeEBuilder5(id, memberName, Map())
+    def 이제(@unused x: 스킵.type): TypeEBuilder5 = TypeEBuilder5(id, memberName, Map())
   }
 
   case class TypeEBuilder5(id: StringID, memberName: Vector[StringID], methods: Map[VarID, Expr]) {
@@ -809,5 +837,3 @@ implicit class ProjBuilderFromId(id: String) extends ProjBuilder(Id(id))
 
 implicit class ProjBuilderFromInt(n: Int) extends ProjBuilder(Num(n))
 
-def readInt(@unused expr: Expr = UnitE()): Expr =
-  Num(scala.io.StdIn.readInt)

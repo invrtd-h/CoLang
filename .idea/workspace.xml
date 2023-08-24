@@ -4,22 +4,17 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="파일 분할 를! 한 나">
-      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/experimental/experimental.scala" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/scala/mte/mtetype/mtetype.scala" afterDir="false" />
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="저장용 커밋">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/main.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/main.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/error/error.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/error/error.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/expr.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/ids.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/ids/ids.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/experimental/experimental.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/experimental/experimental.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mtetype.scala" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mtetype/mtetype.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mtetype/mtetype.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/ops3/ops3.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/ops3/ops3.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/pret.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/pret/pret.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/utility/utility.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/utility/utility.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/value.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/value/value.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/pret/pret.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/pret/pret.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/value/value.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/value/value.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -135,7 +130,8 @@
       <workItem from="1690950484864" duration="2883000" />
       <workItem from="1691389465635" duration="48102000" />
       <workItem from="1692065461486" duration="95485000" />
-      <workItem from="1692659941517" duration="26942000" />
+      <workItem from="1692659941517" duration="40083000" />
+      <workItem from="1692879360810" duration="2436000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -452,7 +448,14 @@
       <option name="project" value="LOCAL" />
       <updated>1692632263178</updated>
     </task>
-    <option name="localTasksCounter" value="46" />
+    <task id="LOCAL-00046" summary="저장용 커밋">
+      <created>1692796066451</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1692796066451</updated>
+    </task>
+    <option name="localTasksCounter" value="47" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -470,7 +473,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="assertion 구문 추가" />
     <MESSAGE value="모든 변수가 수정 가능" />
     <MESSAGE value="포인터 추가 중" />
     <MESSAGE value="If문 블럭 처리 완료, 다시 Box oriented expression으로 돌아가야 할 것 같음" />
@@ -495,7 +497,8 @@
     <MESSAGE value="마이너한 버그를 수정한 나" />
     <MESSAGE value="파일 분할을 한 나" />
     <MESSAGE value="파일 분할 를! 한 나" />
-    <option name="LAST_COMMIT_MESSAGE" value="파일 분할 를! 한 나" />
+    <MESSAGE value="저장용 커밋" />
+    <option name="LAST_COMMIT_MESSAGE" value="저장용 커밋" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

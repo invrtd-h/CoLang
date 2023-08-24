@@ -4,64 +4,80 @@ import mte.ids.StringID
 import mte.error._
 
 import scala.annotation.{targetName, unused}
+import scala.util.{Try, Success, Failure}
 
 private[mte] sealed trait Type {
   @targetName("w")
   def :>(rhs: Type): Boolean = isSubtypeOf(this, rhs)
+
+  @targetName("ww")
+  def :>!(rhs: Type): Try[Unit] =
+    assertSubtype(this, rhs)
 }
 
 private[mte] case object UnitT extends Type
-
-private[mte] case object TopT extends Type
-
-private[mte] case object BottomT extends Type
 
 private[mte] case object NumT extends Type {
   override def toString: String = "유리계수"
 }
 
+private[mte] case object StrT extends Type {
+  override def toString: String = "글"
+}
+
 private[mte] case class ArrowT(args: Vector[Type], ret: Type) extends Type
 
 private[mte] case class VecT(t: Type) extends Type {
-  override def toString: String = s"한줄서기($t)"
+  override def toString: String = s"한줄서기[$t]"
 }
 
-private[mte] case class HMapT(k: Type, v: Type) extends Type
+private[mte] case class HMapT(k: Type, v: Type) extends Type {
+  override def toString: String = s"뭉탱이[$k -> $v]"
+}
+
+private[mte] case class ObjT(members: Map[StringID, Type],
+                             typeName: String) extends Type {
+  override def toString: String = s"코괴물($typeName)"
+}
 
 private[mte] case class IdT(id: String) extends Type
 
 private[mte] case class VarT(t: Option[Type] = None) extends Type
 
-private def isSubtypeOf(supertype: Type, subtype: Type): Boolean = supertype match {
-  case UnitT => ???
-  case TopT => true
-  case BottomT => subtype match {
-    case BottomT => true
-    case _ => false
+private def isSubtypeOf(supertype: Type, subtype: Type): Boolean = {
+  def unwind(t: Type): Type = t match {
+    case VarT(t) => t match {
+      case Some(t) => t
+      case None => throw MteTypeUnsolvedException("")
+    }
+    case _ => t
   }
-  case NumT => subtype match {
-    case NumT => true
-    case BottomT => true
-    case _ => false
+
+  val superT = unwind(supertype)
+  val subT = unwind(subtype)
+
+  superT match {
+    case UnitT => ???
+    case NumT => subT match {
+      case NumT => true
+      case _ => false
+    }
+    case ArrowT(a, t) => subT match {
+      case ArrowT(b, u) =>
+        a.zip(b).map((l, r) => isSubtypeOf(r, l)).reduce(_ && _) && isSubtypeOf(t, u)
+      case _ => false
+    }
+    case VecT(t) => subT match {
+      case VecT(u) => isSubtypeOf(t, u)
+      case _ => false
+    }
+    case HMapT(kl, vl) => subT match {
+      case HMapT(kr, vr) => kl == kr && isSubtypeOf(vl, vr)
+      case _ => false
+    }
+    case IdT(id) => ???
+    case _ => throw MteUnexpectedErr("")
   }
-  case ArrowT(a, t) => subtype match {
-    case ArrowT(b, u) =>
-      a.zip(b).map((l, r) => isSubtypeOf(r, l)).reduce(_ && _) && isSubtypeOf(t, u)
-    case BottomT => true
-    case _ => false
-  }
-  case VecT(t) => subtype match {
-    case VecT(u) => isSubtypeOf(t, u)
-    case BottomT => true
-    case _ => false
-  }
-  case HMapT(kl, vl) => subtype match {
-    case HMapT(kr, vr) => kl == kr && isSubtypeOf(vl, vr)
-    case BottomT => true
-    case _ => false
-  }
-  case IdT(id) => ???
-  case VarT(_) => throw MteUnexpectedErr("")
 }
 
 
@@ -72,32 +88,7 @@ private def isSubtypeOf(supertype: Type, subtype: Type): Boolean = supertype mat
  */
 private[mte] case class TEnv(vars: Map[String, Type], typeIds: Map[String, Type])
 
-
-/**
- * 프로그래머가 사용할 타입 노테이션을 정의한다
- */
-private[mte] sealed trait TypeNotation {
-  def getType: Type
-
-  @unused
-  @targetName("colonColon")
-  def |:(id: String): (StringID, Type) = (StringID(id), getType)
-
-  @unused
-  @targetName("w")
-  def >>:(argTypes: TypeNotation*): TypeNotation = ArrowTNotation(argTypes.toVector, this)
-}
-
-@unused
-case object 스킵 extends TypeNotation {
-  override def getType: Type = VarT(None)
-}
-
-@unused
-case object 유리계수 extends TypeNotation {
-  override def getType: Type = NumT
-}
-
-private case class ArrowTNotation(args: Vector[TypeNotation], ret: TypeNotation) extends TypeNotation {
-  override def getType: Type = ArrowT(args.map(x => x.getType), ret.getType)
+private[mte] def assertSubtype(supertype: Type, subtype: Type): Try[Unit] = {
+  assert(supertype :> subtype, s"얘! 여기 지금 $subtype 이게 $supertype(으)로 보이니??")
+  Success(())
 }

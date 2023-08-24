@@ -18,7 +18,7 @@ final case class MteUnexpectedErr(private val message: String = "",
                                   private val cause: Throwable = None.orNull)
   extends Exception(message, cause)
 
-class MteRuntimeException(message: String) extends Exception(message) {
+class MteExc(message: String) extends Exception(message) {
   def this(message: String, cause: Throwable) = {
     this(message)
     initCause(cause)
@@ -31,5 +31,10 @@ class MteRuntimeException(message: String) extends Exception(message) {
   def this() = this(null: String)
 }
 
-case class MteAssertionFailedException(msg: String) extends MteRuntimeException(msg)
+class MteRuntimeExc(msg: String) extends MteExc(msg)
 
+class MteSyntaxExc(msg: String) extends MteExc(msg)
+
+case class MteAssertionFailedException(msg: String) extends MteRuntimeExc(msg)
+
+case class MteTypeUnsolvedException(msg: String) extends MteSyntaxExc(msg)

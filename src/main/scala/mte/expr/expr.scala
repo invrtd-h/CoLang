@@ -19,11 +19,7 @@ private[mte] case class Num(data: BigInt) extends Expr {
   override def toString: String = data.toString
 }
 
-private[mte] case class UnitE() extends Expr {
-  override def toString: String = "unit"
-}
-
-private[mte] val unitE: UnitE = UnitE()
+private[mte] case class StrE(data: String) extends Expr
 
 private[mte] case class BinaryOp(lhs: Expr, rhs: Expr, op: Op) extends Expr {
   override def toString: String =
@@ -62,6 +58,10 @@ private[mte] case class App(fnExpr: Expr, argExpr: Vector[Expr]) extends Expr {
   override def toString: String = s"App($fnExpr, ${argExpr.cut})"
 }
 
+private[mte] case class Tuple(data: Vector[Expr], types: Vector[Type]) extends Expr
+
+private[mte] val unitE: Expr = Tuple(Vector(), Vector())
+
 private[mte] case class Seqn(lhs: Expr, rhs: Expr) extends Expr
 
 private[mte] case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
@@ -82,8 +82,4 @@ private[mte] case class ClassDef(memberName: Vector[StringID],
                             next: Expr) extends Expr {
   override def toString: String =
     s"ClassDef(이름:$typeName, 인자:[${memberName.cut}], 메서드:[${methods.cut}], 계속:$next)"
-}
-
-private[mte] case class BuiltinFnE2E(fn: Expr => Expr, arg: Expr, opName: String) extends Expr {
-  override def toString: String = s"BF<$opName>($arg)"
 }
