@@ -1,7 +1,7 @@
 package mte.expr
 
 import mte.ops.Op
-import mte.value.Value
+import mte.value.{FOV, Value}
 import mte.mtetype.Type
 import mte.ids._
 import mte.utility.strcut._
@@ -27,7 +27,7 @@ private[mte] case class BinaryOp(lhs: Expr, rhs: Expr, op: Op) extends Expr {
 }
 
 private[mte] case class TernaryOp(x: Expr, y: Expr, z: Expr,
-                             op: (=> Value, => Value, => Value) => Either[String, Value],
+                             op: (=> FOV, => FOV, => FOV) => Either[String, FOV],
                              opName: String) extends Expr {
   override def toString: String =
     s"<$opName>($x, $y, $z)"
@@ -49,10 +49,10 @@ private[mte] case class ValDef(id: StringID, t: Type, initExpr: Expr, next: Expr
 }
 
 private[mte] case class Fun(funName: VarID,
-                       argName: Vector[VarID],
-                       argsT: Vector[Type],
-                       retT: Type,
-                       fExpr: Expr) extends Expr
+                            argName: Vector[VarID],
+                            argsT: Vector[Type],
+                            retT: Type,
+                            fExpr: Expr) extends Expr
 
 private[mte] case class App(fnExpr: Expr, argExpr: Vector[Expr]) extends Expr {
   override def toString: String = s"App($fnExpr, ${argExpr.cut})"

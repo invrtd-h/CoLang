@@ -2,17 +2,17 @@ package mte.ops3
 
 import mte.*
 import mte.expr.{Expr, TernaryOp}
-import mte.value.{HMapV, NumV, Value, VecV}
+import mte.value.{FOV, HMapV, NumV, VecV}
 
 def makeTernaryIfExpr(cond: Expr, yes: Expr, no: Expr): Expr = {
-  def ternaryIf(cond: => Value, yes: => Value, no: => Value): Either[String, Value] =
+  def ternaryIf(cond: => FOV, yes: => FOV, no: => FOV): Either[String, FOV] =
     if (cond.isTruthy) Right(yes) else Right(no)
 
   TernaryOp(cond, yes, no, ternaryIf, "if")
 }
 
 def makeUpdatedExpr(vecE: Expr, idxE: Expr, dataE: Expr): Expr = {
-  def updated(vec: => Value, idx: => Value, data: => Value): Either[String, Value] = vec match {
+  def updated(vec: => FOV, idx: => FOV, data: => FOV): Either[String, FOV] = vec match {
     case VecV(vec) => idx match {
       case NumV(idx) =>
         if (idx < 0 || idx >= vec.length)

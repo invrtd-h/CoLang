@@ -119,8 +119,8 @@ private[mte] def pret(expr: Expr, env: Env): Value = {
           s"얘! 지금 네 눈에 $err (${ref}를 실행했다 맨이야) 이게 NFT로 보이니? env=$env"
         )
       }
-    case Vec(data, _) => VecV(data.map(x => pret(x, env)))
-    case HMap(data, _, _) => HMapV(data.map((key, value) => (pret(key, env), pret(value, env))))
+    case Vec(data, _) => VecV(data.map(x => pret(x, env).toFOV))
+    case HMap(data, _, _) => HMapV(data.map((key, value) => (pret(key, env).toFOV, pret(value, env).toFOV)))
     case ClassDef(memberName, methods, typeName, next) =>
       if (env.contains(typeName)) throw MteRuntimeErr(
         s"얘! 이미 사용하고 있는 변수명은 코괴물 이름이 되지 아내!"

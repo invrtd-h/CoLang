@@ -54,19 +54,19 @@ private[mte] case class CloV(argName: Vector[VarID], fExpr: Expr, var fEnv: Env)
 
 private[mte] case class TupleV(data: Vector[Value]) extends FOV
 
-private[mte] val unitV: Value = TupleV(Vector())
+private[mte] val unitV: FOV = TupleV(Vector())
 
-private[mte] case class VecV(data: Vector[Value]) extends FOV {
+private[mte] case class VecV(data: Vector[FOV]) extends FOV {
   override def toString: String = s"한줄서기(${data.cut})"
 }
 
-private[mte] case class HMapV(data: Map[Value, Value]) extends FOV {
+private[mte] case class HMapV(data: Map[FOV, FOV]) extends FOV {
   override def toString: String = data.toString()
 }
 
-private[mte] case class ClassV(memberNames: Vector[StringID], 
-                               methods: Map[VarID, Value], 
-                               typeName: StringID, 
+private[mte] case class ClassV(memberNames: Vector[StringID],
+                               methods: Map[VarID, Value],
+                               typeName: StringID,
                                var cEnv: Env) extends NFOV {
   def makeMethodOf(obj: ObjV, methodName: VarID): CloV = methods.get(methodName) match {
     case Some(value) => value match {
@@ -94,7 +94,7 @@ private[mte] case class ClassV(memberNames: Vector[StringID],
   override def toString: String = s"코괴물(${typeName.id})"
 }
 
-private[mte] case class ObjV(data: Map[StringID, Value], 
+private[mte] case class ObjV(data: Map[StringID, Value],
                              supertype: ClassV) extends FOV {
   override def toString: String =
     s"${supertype.typeName.id}(${data.cut})"

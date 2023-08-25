@@ -12,7 +12,7 @@ def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
   case BinaryOp(lhs, rhs, op) => tailcall(
     pret(lhs, env, x => tailcall(
       pret(rhs, env, y => tailcall(
-        cont(op.calculate(x, y) match {
+        cont(op.calculate(x.toFOV, y.toFOV) match {
           case Left(value) => throw error.MteRuntimeErr(value)
           case Right(value) => value
         })
@@ -23,7 +23,7 @@ def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
     pret(x, env, xx => tailcall(
       pret(y, env, yy => tailcall(
         pret(z, env, zz => tailcall(
-          cont(op(xx, yy, zz) match {
+          cont(op(xx.toFOV, yy.toFOV, zz.toFOV) match {
             case Left(value) => throw error.MteRuntimeErr(value)
             case Right(value) => value
           })
