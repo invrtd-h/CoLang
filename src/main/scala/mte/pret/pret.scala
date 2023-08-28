@@ -1,10 +1,12 @@
 package mte.pret
 
-import mte.expr._
-import mte.value._
-import mte.ids._
-import mte.mtetype._
-import mte.error._
+import mte.expr.*
+import mte.value.*
+import mte.ids.*
+import mte.mtetype.*
+import mte.error.*
+
+import scala.util.{Failure, Success}
 
 /**
  * 타입체크를 한 뒤 코드를 실행한다 맨이야
@@ -13,12 +15,56 @@ import mte.error._
  * @return 프로그램의 결과
  */
 private[mte] def run(expr: Expr): Value = {
-  staticCheck(expr, TEnv(Map(), Map()))
+  typePret(expr, TEnv(Map(), Map()))
   pret(expr, Map())
 }
 
-private def staticCheck(expr: Expr, tEnv: TEnv): Type = {
-  NumT
+private def typePret(expr: Expr, tEnv: TEnv): Type = {
+  expr match {
+    case Num(_) => NumTV
+    case StrE(_) => StrTV
+    case BinaryOp(lhs, rhs, op) =>
+      op.calculateType(typePret(lhs, tEnv), typePret(rhs, tEnv)) match {
+        case Failure(exception) => throw exception
+        case Success(value) => value
+      }
+    case TernaryOp(x, y, z, op, opName) => ???
+    case Id(name) => ???
+    case ValDef(id, t, _, next) => ???
+    case Fun(funName, argName, argsT, retT, fExpr) => ???
+    case App(fnExpr, argExpr) => ???
+    case Tuple(data, types) => ???
+    case Seqn(lhs, rhs) => typePret(lhs, tEnv); typePret(rhs, tEnv)
+    case WhileN0(cond, exprIn) => ???
+    case Proj(obj, id) => ???
+    case BoxDef(id, t, initExpr, next) => ???
+    case BoxSet(box, setExpr) => ???
+    case Vec(data, t) => ???
+    case HMap(data, kT, vT) => ???
+    case ClassDef(memberName, methods, typeName, next) => ???
+  }
+}
+
+private def typePret(ti: TypeInfo, tEnv: TEnv): Type = {
+  ti match {
+    case NumT => NumTV
+    case StrT => StrTV
+    case ArrowT(args, ret) =>
+      ArrowTV(args.map(x => typePret(x, tEnv)), typePret(ret, tEnv))
+    case TupleT(types) =>
+      TupleTV(types.map(x => typePret(x, tEnv)))
+    case VecT(t) => VecTV(typePret(t, tEnv))
+    case HMapT(k, v) => HMapTV(typePret(k, tEnv), typePret(v, tEnv))
+    case ObjT(members, typeName) => ???
+    case ForAllT(args, retT) => ???
+    case IdT(id) => ???
+    case VarT(t) => t match {
+      case Some(value) => typePret(value, tEnv)
+      case None => throw MteTypeUnsolvedException(
+        s"얘! 여기 지금 $ti 이게 무슨 타입인지를 내가 어떻게 알아!! 어딜 감히 개발자 나부랭탱이가 컴파일러랑 특수한 관계인 척을 하려고..."
+      )
+    }
+  }
 }
 
 private[mte] def pret(expr: Expr, env: Env): Value = {

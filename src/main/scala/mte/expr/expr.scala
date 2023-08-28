@@ -2,7 +2,7 @@ package mte.expr
 
 import mte.ops.Op
 import mte.value.{FOV, Value}
-import mte.mtetype.Type
+import mte.mtetype.TypeInfo
 import mte.ids._
 import mte.utility.strcut._
 
@@ -43,22 +43,22 @@ private[mte] object Id {
   }
 }
 
-private[mte] case class ValDef(id: StringID, t: Type, initExpr: Expr, next: Expr) extends Expr {
+private[mte] case class ValDef(id: StringID, t: TypeInfo, initExpr: Expr, next: Expr) extends Expr {
   override def toString: String =
     s"ValDef(변수명:$id, 타입:$t, 초기치:$initExpr, 계속:$next)"
 }
 
 private[mte] case class Fun(funName: VarID,
                             argName: Vector[VarID],
-                            argsT: Vector[Type],
-                            retT: Type,
+                            argsT: Vector[TypeInfo],
+                            retT: TypeInfo,
                             fExpr: Expr) extends Expr
 
 private[mte] case class App(fnExpr: Expr, argExpr: Vector[Expr]) extends Expr {
   override def toString: String = s"App($fnExpr, ${argExpr.cut})"
 }
 
-private[mte] case class Tuple(data: Vector[Expr], types: Vector[Type]) extends Expr
+private[mte] case class Tuple(data: Vector[Expr], types: Vector[TypeInfo]) extends Expr
 
 private[mte] val unitE: Expr = Tuple(Vector(), Vector())
 
@@ -68,13 +68,13 @@ private[mte] case class WhileN0(cond: Expr, exprIn: Expr) extends Expr
 
 private[mte] case class Proj(obj: Expr, id: VarID) extends Expr
 
-private[mte] case class BoxDef(id: StringID, t: Type, initExpr: Expr, next: Expr) extends Expr
+private[mte] case class BoxDef(id: StringID, t: TypeInfo, initExpr: Expr, next: Expr) extends Expr
 
 private[mte] case class BoxSet(box: Expr, setExpr: Expr) extends Expr
 
-private[mte] case class Vec(data: Vector[Expr], t: Type) extends Expr
+private[mte] case class Vec(data: Vector[Expr], t: TypeInfo) extends Expr
 
-private[mte] case class HMap(data: Map[Expr, Expr], kT: Type, vT: Type) extends Expr
+private[mte] case class HMap(data: Map[Expr, Expr], kT: TypeInfo, vT: TypeInfo) extends Expr
 
 private[mte] case class ClassDef(memberName: Vector[StringID],
                             methods: Map[VarID, Expr],

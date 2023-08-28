@@ -1,19 +1,21 @@
 package mte.experimental
 
 import scala.util.control.TailCalls.*
-import mte.*
+import mte.ids._
 import mte.expr._
 import mte.value._
+import mte.error._
 
 type Cont = Value => TailRec[Value]
 
 def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
   case Num(data) => tailcall(cont(NumV(data)))
+  case StrE(data) => tailcall(cont(StrV(data)))
   case BinaryOp(lhs, rhs, op) => tailcall(
     pret(lhs, env, x => tailcall(
       pret(rhs, env, y => tailcall(
         cont(op.calculate(x.toFOV, y.toFOV) match {
-          case Left(value) => throw error.MteRuntimeErr(value)
+          case Left(value) => throw MteRuntimeErr(value)
           case Right(value) => value
         })
       ))
@@ -24,7 +26,7 @@ def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
       pret(y, env, yy => tailcall(
         pret(z, env, zz => tailcall(
           cont(op(xx.toFOV, yy.toFOV, zz.toFOV) match {
-            case Left(value) => throw error.MteRuntimeErr(value)
+            case Left(value) => throw MteRuntimeErr(value)
             case Right(value) => value
           })
         ))

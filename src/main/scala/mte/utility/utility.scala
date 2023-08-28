@@ -1,7 +1,7 @@
 package mte.utility
 
 import scala.annotation.{tailrec, targetName, unused}
-import scala.util.Random
+import scala.util.{Random, Try}
 
 import mte._
 
@@ -55,3 +55,9 @@ def logNot(lhs: BigInt): BigInt =
 @unused
 def maxInt(lhs: BigInt, rhs: BigInt): BigInt =
   if (lhs > rhs) lhs else rhs
+  
+implicit class AssertLen[T](vec: Vector[T]) {
+  def assertLen(n: Int): Try[Unit] = Try {
+    assert(vec.length == n)
+  }
+}

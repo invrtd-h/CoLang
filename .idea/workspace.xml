@@ -6,12 +6,15 @@
   <component name="ChangeListManager">
     <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="저장용 커밋">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/error/error.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/error/error.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/experimental/experimental.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/experimental/experimental.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mtetype/mtetype.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mtetype/mtetype.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/ops3/ops3.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/ops3/ops3.scala" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/scala/mte/pret/pret.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/pret/pret.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/value/value.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/value/value.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/utility/utility.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/utility/utility.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -128,7 +131,8 @@
       <workItem from="1691389465635" duration="48102000" />
       <workItem from="1692065461486" duration="95485000" />
       <workItem from="1692659941517" duration="40083000" />
-      <workItem from="1692879360810" duration="8115000" />
+      <workItem from="1692879360810" duration="24154000" />
+      <workItem from="1693181667489" duration="7143000" />
     </task>
     <task id="LOCAL-00001" summary="i">
       <created>1689354448161</created>
@@ -459,7 +463,14 @@
       <option name="project" value="LOCAL" />
       <updated>1692882121002</updated>
     </task>
-    <option name="localTasksCounter" value="48" />
+    <task id="LOCAL-00048" summary="저장용 커밋">
+      <created>1692948748589</created>
+      <option name="number" value="00048" />
+      <option name="presentableId" value="LOCAL-00048" />
+      <option name="project" value="LOCAL" />
+      <updated>1692948748589</updated>
+    </task>
+    <option name="localTasksCounter" value="49" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

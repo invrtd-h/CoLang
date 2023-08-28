@@ -28,7 +28,7 @@ def vecToSeq(vec: Vector[Expr]): Expr = {
   }
 }
 
-def newFor(iterName: String, iterT: Type, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
+def newFor(iterName: String, iterT: TypeInfo, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
   BoxDef(StringID(iterName), iterT, initExpr, WhileN0(condExpr, Seqn(
     inExpr,
     manipulationExpr
