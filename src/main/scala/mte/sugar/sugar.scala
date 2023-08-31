@@ -1,9 +1,13 @@
 package mte.sugar
 
-import scala.annotation.{tailrec, targetName, unused}
-import mte._
+import mte.expr._
+import mte.mtetype._
+import mte.ids.{AnonFn1, StringID}
+import mte.ops.{makeGtExpr, makeAddExpr}
 
-def exprToFn(expr: Expr): Expr = Fun(AnonFn1, Vector(), expr)
+import scala.annotation.tailrec
+
+def exprToFn(expr: Expr): Expr = Fun(AnonFn1, Vector(), Vector(), VarT(), expr)
 
 def newScope(expr: Expr): Expr = App(exprToFn(expr), Vector())
 
@@ -24,8 +28,8 @@ def vecToSeq(vec: Vector[Expr]): Expr = {
   }
 }
 
-def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
-  BoxDef(StringID(iterName), initExpr, WhileN0(condExpr, Seqn(
+def newFor(iterName: String, iterT: TypeInfo, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
+  BoxDef(StringID(iterName), iterT, initExpr, WhileN0(condExpr, Seqn(
     inExpr,
     manipulationExpr
   )))
@@ -33,8 +37,9 @@ def newFor(iterName: String, initExpr: Expr, condExpr: Expr, manipulationExpr: E
 
 def newSimpleFor(iterName: String, lbdInclusive: Expr, ubdExclusive: Expr, inExpr: Expr): Expr = newFor(
   iterName = iterName,
+  iterT = NumT,
   initExpr = lbdInclusive,
-  condExpr = ops.makeGtExpr(ubdExclusive, Id(StringID(iterName))),
-  manipulationExpr = SetBox(Id(StringID(iterName)), ops.makeAddExpr(Id(StringID(iterName)), Num(1))),
+  condExpr = makeGtExpr(ubdExclusive, Id(StringID(iterName))),
+  manipulationExpr = BoxSet(Id(StringID(iterName)), makeAddExpr(Id(StringID(iterName)), Num(1))),
   inExpr = inExpr
 )

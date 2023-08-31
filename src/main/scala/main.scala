@@ -1,4 +1,5 @@
-import mte._
+import mte.*
+
 import scala.language.postfixOps
 import scala.annotation.unused
 
@@ -35,7 +36,7 @@ def test1(): Unit = {
 def test2(): Unit = {
   // class definition decay test
   춘잣! (
-    "래퍼" 하는 플레이보이 예전에 "뭉" 하더놈 같은데 이제 스키비야 하는갑지 돈좀버냐?? 개노잼 노라라??,
+    "래퍼" 하는 플레이보이 예전에 "뭉" 하더놈 같은데 이제 스킵 하는갑지 돈좀버냐?? 개노잼 노라라??,
     뭐 드시냐고 5 번째 물어봅니다 즐기면서가자 "래퍼" 리액션 "%s\n"
   )
 }
@@ -194,6 +195,14 @@ def test11(): Unit = {
       "다이나믹 프로그래밍"아 ("피보나치", 뭉탱이()) 먹어라??
     ) 를 했대,
     "피보나치2"야 40 먹어라?? 리액션 "%s\n"
+  )
+}
+
+def test12(): Unit = {
+  "and" |: 유리계수 >>: 유리계수
+  "xod" |: (유리계수, 유리계수) >>: 유리계수
+  춘잣! (
+    아니세상에 자기가 "뭉" |: 유리계수 라는사람인데 1 를 했대
   )
 }
 
