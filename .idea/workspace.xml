@@ -4,15 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="타입 정보 추가">
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="마이너한 이름 이슈 를! 수정한 나">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/error/error.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/error/error.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mte.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/mtetype/mtetype.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/mtetype/mtetype.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/ops/ops.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/pret/pret.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/pret/pret.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/sugar/sugar.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -30,7 +23,7 @@
   <component name="Git.Settings">
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="newBoxRule" />
+        <entry key="$PROJECT_DIR$" value="typing" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -116,9 +109,11 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Application.main" />
         <item itemvalue="Application.mte.experimental.typesys.main" />
         <item itemvalue="Application.mte.experimental.main" />
+        <item itemvalue="Application.main" />
+        <item itemvalue="Application.main" />
+        <item itemvalue="Application.main" />
       </list>
     </recent_temporary>
   </component>
@@ -159,14 +154,7 @@
       <workItem from="1692659941517" duration="40083000" />
       <workItem from="1692879360810" duration="24154000" />
       <workItem from="1693181667489" duration="31004000" />
-      <workItem from="1693373259936" duration="4936000" />
-    </task>
-    <task id="LOCAL-00002" summary="i">
-      <created>1689389778593</created>
-      <option name="number" value="00002" />
-      <option name="presentableId" value="LOCAL-00002" />
-      <option name="project" value="LOCAL" />
-      <updated>1689389778593</updated>
+      <workItem from="1693373259936" duration="6324000" />
     </task>
     <task id="LOCAL-00003" summary="i">
       <created>1689406332257</created>
@@ -504,7 +492,14 @@
       <option name="project" value="LOCAL" />
       <updated>1693443438872</updated>
     </task>
-    <option name="localTasksCounter" value="51" />
+    <task id="LOCAL-00051" summary="마이너한 이름 이슈 를! 수정한 나">
+      <created>1693446787364</created>
+      <option name="number" value="00051" />
+      <option name="presentableId" value="LOCAL-00051" />
+      <option name="project" value="LOCAL" />
+      <updated>1693446787364</updated>
+    </task>
+    <option name="localTasksCounter" value="52" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -522,7 +517,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="포인터 추가 중" />
     <MESSAGE value="If문 블럭 처리 완료, 다시 Box oriented expression으로 돌아가야 할 것 같음" />
     <MESSAGE value="Box oriented로 돌아감" />
     <MESSAGE value="for문 scope 처리 적용" />
@@ -547,7 +541,8 @@
     <MESSAGE value="파일 분할 를! 한 나" />
     <MESSAGE value="저장용 커밋" />
     <MESSAGE value="타입 정보 추가" />
-    <option name="LAST_COMMIT_MESSAGE" value="타입 정보 추가" />
+    <MESSAGE value="마이너한 이름 이슈 를! 수정한 나" />
+    <option name="LAST_COMMIT_MESSAGE" value="마이너한 이름 이슈 를! 수정한 나" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

@@ -83,3 +83,5 @@ private[mte] case class ClassDef(memberName: Vector[StringID],
   override def toString: String =
     s"ClassDef(이름:$typeName, 인자:[${memberName.cut}], 메서드:[${methods.cut}], 계속:$next)"
 }
+
+private[mte] sealed trait Cmd
