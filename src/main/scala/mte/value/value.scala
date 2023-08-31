@@ -44,9 +44,7 @@ private[mte] case class CloV(argName: Vector[VarID], fExpr: Expr, var fEnv: Env)
 
   def call(arg: Vector[Value]): Value = {
     if (argName.length != arg.length) {
-      throw MteSyntaxErr(
-        s"얘! 지금 돈 ${arg.length} 원에 함수 ${this}를 불러달라고 한 거니?? 단가가 안 맞잖아 임마!!"
-      )
+      throw MteUnexpectedErr()
     }
     pret(fExpr, fEnv ++ argName.zip(arg).toMap)
   }

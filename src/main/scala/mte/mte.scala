@@ -1,8 +1,8 @@
 package mte
 
-import mte.expr.{App, BinaryOp, BoxDef, BoxSet, ClassDef, Expr, Fun, HMap, Id, Num, Proj, Seqn, TernaryOp, unitE, ValDef, Vec, WhileN0}
+import mte.expr._
 import mte.ids.{AnonArg, AnonFn1, FnCallOp, StringID, ThisKW, VarID}
-import mte.mtetype.{ArrowT, NumT, TypeInfo, VarT}
+import mte.mtetype.{ArrowTE, NumTE, TypeExpr, VarTE}
 import mte.value.{BoxV, Value}
 import mte.pret.run
 
@@ -31,11 +31,11 @@ import scala.collection.immutable.Vector
  * 프로그래머가 사용할 타입 노테이션을 정의한다
  */
 private[mte] sealed trait TypeNotation {
-  def getType: TypeInfo
+  def getType: TypeExpr
 
   @unused
   @targetName("colonColon")
-  def |:(id: String): (StringID, TypeInfo) = (StringID(id), getType)
+  def |:(id: String): (StringID, TypeExpr) = (StringID(id), getType)
 
   @unused
   @targetName("w")
@@ -44,25 +44,25 @@ private[mte] sealed trait TypeNotation {
 
 @unused
 case object 스킵 extends TypeNotation {
-  override def getType: TypeInfo = VarT(None)
+  override def getType: TypeExpr = VarTE(None)
 }
 
 @unused
 case object 유리계수 extends TypeNotation {
-  override def getType: TypeInfo = NumT
+  override def getType: TypeExpr = NumTE
 }
 
 private case class ArrowTNotation(args: Vector[TypeNotation], ret: TypeNotation) extends TypeNotation {
-  override def getType: TypeInfo = ArrowT(args.map(x => x.getType), ret.getType)
+  override def getType: TypeExpr = ArrowTE(args.map(x => x.getType), ret.getType)
 }
 
 sealed trait CodeFragment
 
 case class CodeFragmentGeneral(expr: Expr) extends CodeFragment
 
-case class ValDefFragment(name: StringID, t: TypeInfo, expr: Expr) extends CodeFragment
+case class ValDefFragment(name: StringID, t: TypeExpr, expr: Expr) extends CodeFragment
 
-case class BoxDefFragment(name: StringID, t: TypeInfo, expr: Expr) extends CodeFragment
+case class BoxDefFragment(name: StringID, t: TypeExpr, expr: Expr) extends CodeFragment
 
 case class ClassDefFragment(memberName: Vector[StringID],
                             methods: Map[VarID, Expr],
@@ -86,9 +86,9 @@ def joinFragments(fragments: Vector[CodeFragment]): Expr = {
   }
 }
 
-type VarInfo = (StringID, TypeInfo)
+type VarInfo = (StringID, TypeExpr)
 
-implicit def strToVarInfo(id: String): (StringID, TypeInfo) = (StringID(id), VarT())
+implicit def strToVarInfo(id: String): (StringID, TypeExpr) = (StringID(id), VarTE())
 
 implicit def exprToFragment(expr: Expr): CodeFragment = CodeFragmentGeneral(expr)
 implicit def strToId(id: String): Expr = Id(id)
@@ -279,12 +279,12 @@ case object 유링게슝한 {
  */
 case object 아니세상에 {
   @unused
-  def 자기가(info: (StringID, TypeInfo)): ValBuilder = {
+  def 자기가(info: (StringID, TypeExpr)): ValBuilder = {
     val (name, t) = info
     ValBuilder(name, t)
   }
 
-  case class ValBuilder(name: StringID, t: TypeInfo) {
+  case class ValBuilder(name: StringID, t: TypeExpr) {
     @unused
     def 라는사람인데(expr: Expr): ValBuilder2 =
       ValBuilder2(name, t, expr)
@@ -294,7 +294,7 @@ case object 아니세상에 {
       ValBuilder2(name, t, expr)
   }
 
-  case class ValBuilder2(name: StringID, t: TypeInfo, expr: Expr) {
+  case class ValBuilder2(name: StringID, t: TypeExpr, expr: Expr) {
     @unused
     def 를(@unused h: 했대.type): CodeFragment =
       ValDefFragment(name, t, expr)
@@ -306,7 +306,7 @@ case object 아니세상에 {
     @unused
     def 발행(@unused x: NFT.type): DefBoxBuilder = DefBoxBuilder(name, t, expr)
 
-    case class DefBoxBuilder(name: StringID, t: TypeInfo, expr: Expr) {
+    case class DefBoxBuilder(name: StringID, t: TypeExpr, expr: Expr) {
       @unused
       def 를(@unused h: 했대.type): CodeFragment = BoxDefFragment(name, t, expr)
 
@@ -318,26 +318,26 @@ case object 아니세상에 {
 
 case object 했대
 
-case class LambdaBuilder(argsID: Vector[StringID], argsT: Vector[TypeInfo]) {
+case class LambdaBuilder(argsID: Vector[StringID], argsT: Vector[TypeExpr]) {
   @unused
   def 은(fnExpr: CodeFragment*): LambdaBuilder2 = LambdaBuilder2(argsID, argsT, joinFragments(fnExpr.toVector))
 
   @unused
   def 는(fnExpr: CodeFragment*): LambdaBuilder2 = LambdaBuilder2(argsID, argsT, joinFragments(fnExpr.toVector))
 
-  class LambdaBuilder2(argsID: Vector[StringID], argsT: Vector[TypeInfo], fnExpr: Expr) {
+  class LambdaBuilder2(argsID: Vector[StringID], argsT: Vector[TypeExpr], fnExpr: Expr) {
     @unused
-    def 다(@unused joyGo: EndState4): Expr = Fun(AnonFn1, argsID, argsT, VarT(), fnExpr)
+    def 다(@unused joyGo: EndState4): Expr = Fun(AnonFn1, argsID, argsT, VarTE(), fnExpr)
 
     @unused
-    def 이다(@unused joyGo: EndState4): Expr = expr.Fun(AnonFn1, argsID, argsT, VarT(), fnExpr)
+    def 이다(@unused joyGo: EndState4): Expr = expr.Fun(AnonFn1, argsID, argsT, VarTE(), fnExpr)
   }
 }
 
-implicit class LambdaBuilderFromVecStr(args: Vector[(StringID, TypeInfo)])
+implicit class LambdaBuilderFromVecStr(args: Vector[(StringID, TypeExpr)])
   extends LambdaBuilder(args.map((x, _) => x), args.map((_, y) => y))
 
-implicit class LambdaBuilderFromStr(argName: String) extends LambdaBuilder(Vector(StringID(argName)), Vector(VarT()))
+implicit class LambdaBuilderFromStr(argName: String) extends LambdaBuilder(Vector(StringID(argName)), Vector(VarTE()))
 
 @unused
 case object 아이고난 {
@@ -369,7 +369,7 @@ case object 아이고난 {
 
     val argNames = Vector(아이고난1, 아이고난2, 아이고난3, 아이고난4, 아이고난5, 아이고난6, 아이고난7)
     val n = analysis(expr)
-    mte.expr.Fun(AnonFn1, argNames.take(n), Vector.fill(n)(VarT()), VarT(), expr)
+    mte.expr.Fun(AnonFn1, argNames.take(n), Vector.fill(n)(VarTE()), VarTE(), expr)
   }
 }
 
@@ -523,7 +523,7 @@ implicit class PtrSetBuilderFromInt(num: Int) extends SetBoxBuilder(Num(num))
 object 묶음 {
   @unused
   @targetName("factFact")
-  def !!(args: (StringID, TypeInfo)*): Vector[(StringID, TypeInfo)] = args.toVector
+  def !!(args: (StringID, TypeExpr)*): Vector[(StringID, TypeExpr)] = args.toVector
 }
 
 /**
@@ -537,7 +537,7 @@ object 묶음 {
 def 한줄서기(args: Expr*): Expr = {
   var ret: Vector[Expr] = Vector()
   for (arg <- args) ret = ret :+ arg
-  Vec(ret, VarT())
+  Vec(ret, VarTE())
 }
 
 /**
@@ -664,7 +664,7 @@ implicit class VecOpsBuilderFromId(id: String) extends VecOpsBuilder(Id(id))
 implicit class VecOpsBuilderFromInt(num: Int) extends VecOpsBuilder(Num(num))
 
 @unused
-def 뭉탱이(args: (Expr, Expr)*): Expr = HMap(args.toMap, VarT(), VarT())
+def 뭉탱이(args: (Expr, Expr)*): Expr = HMap(args.toMap, VarTE(), VarTE())
 
 @unused
 case object 겸상 {
@@ -766,18 +766,18 @@ case object 개노잼
 
 implicit class TypeEBuilderFromId(id: String) extends TypeEBuilder(StringID(id))
 
-case class TypeEMethodBuilder1(methodName: VarID, retT: TypeInfo) {
+case class TypeEMethodBuilder1(methodName: VarID, retT: TypeExpr) {
   @unused
   def 중에는(@unused x: EndState7): TypeEMethodBuilder2 = TypeEMethodBuilder2(methodName, retT)
 
-  case class TypeEMethodBuilder2(methodName: VarID, retT: TypeInfo) {
+  case class TypeEMethodBuilder2(methodName: VarID, retT: TypeExpr) {
     @unused
-    def 아무리(arg: (StringID, TypeInfo)*): TypeEMethodBuilder3 =
+    def 아무리(arg: (StringID, TypeExpr)*): TypeEMethodBuilder3 =
       val argv = arg.toVector
       TypeEMethodBuilder3(methodName, argv.map(x => x(0)), argv.map(x => x(1)), retT)
   }
 
-  case class TypeEMethodBuilder3(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeInfo], retT: TypeInfo) {
+  case class TypeEMethodBuilder3(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeExpr], retT: TypeExpr) {
     @unused
     def 라도(fragments: CodeFragment*): TypeEMethodBuilder4 =
       TypeEMethodBuilder4(methodName, args, argsT, retT, joinFragments(fragments.toVector))
@@ -787,13 +787,13 @@ case class TypeEMethodBuilder1(methodName: VarID, retT: TypeInfo) {
       TypeEMethodBuilder4(methodName, args, argsT, retT, joinFragments(fragments.toVector))
   }
 
-  case class TypeEMethodBuilder4(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeInfo], retT: TypeInfo, fExpr: Expr) {
+  case class TypeEMethodBuilder4(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeExpr], retT: TypeExpr, fExpr: Expr) {
     @unused
     def 할(@unused x: 수가.type): TypeEMethodBuilder5 =
       TypeEMethodBuilder5(methodName, args, argsT, retT, fExpr)
   }
 
-  case class TypeEMethodBuilder5(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeInfo], retT: TypeInfo, fExpr: Expr) {
+  case class TypeEMethodBuilder5(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeExpr], retT: TypeExpr, fExpr: Expr) {
     @unused
     def 없단다(@unused x: EndState7): TypeEMethodBuilderFinal =
       TypeEMethodBuilderFinal(methodName, args, argsT, retT, fExpr)
@@ -802,19 +802,19 @@ case class TypeEMethodBuilder1(methodName: VarID, retT: TypeInfo) {
 
 case object 수가
 
-private case class TypeEMethodBuilderFinal(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeInfo], retT: TypeInfo, fExpr: Expr)
+private case class TypeEMethodBuilderFinal(methodName: VarID, args: Vector[VarID], argsT: Vector[TypeExpr], retT: TypeExpr, fExpr: Expr)
 
 implicit def methodToFragment(x: TypeEMethodBuilderFinal): CodeFragment = x.methodName match {
-  case id@StringID(_) => ValDefFragment(id, ArrowT(x.argsT, x.retT), expr.Fun(id, x.args, x.argsT, x.retT, x.fExpr))
-  case _ => throw mte.error.MteSyntaxErr(
+  case id@StringID(_) => ValDefFragment(id, ArrowTE(x.argsT, x.retT), expr.Fun(id, x.args, x.argsT, x.retT, x.fExpr))
+  case _ => throw mte.error.MteSyntaxExc(
     s"얘! 지금 메서드가 아닌 함수 이름 꼬라지(${x.methodName}) 이게 뭐니!!"
   )
 }
 
 
-implicit class TypeEMethodBuilderFromString(id: String) extends TypeEMethodBuilder1(StringID(id), VarT())
+implicit class TypeEMethodBuilderFromString(id: String) extends TypeEMethodBuilder1(StringID(id), VarTE())
 
-implicit class TypeEMethodBuilderFromID(id: VarID) extends TypeEMethodBuilder1(id, VarT())
+implicit class TypeEMethodBuilderFromID(id: VarID) extends TypeEMethodBuilder1(id, VarTE())
 
 case class ProjBuilder(obj: Expr) {
   @unused
