@@ -1,6 +1,7 @@
 package mte.error
 
 import mte.mtetype.Type
+import mte.ids.VarID
 import scala.util.{Try, Success, Failure}
 
 def mteAssert(b: Boolean, exception: Exception): Try[Unit] =
@@ -45,10 +46,12 @@ class MteTypeExc(msg: String) extends MteExc(msg)
 
 case class MteAssertionFailedException(msg: String) extends MteRuntimeExc(msg)
 
-case class MteTypeUnsolvedException(msg: String) extends MteSyntaxExc(msg)
+case class MteTypeUnsolvedExc(msg: String) extends MteSyntaxExc(msg)
 
 case class MteTypeNonMatchExc(t: Type, s: String)
   extends MteTypeExc(s"얘! 여기 지금 $t 이게 $s 분류의 타입으로 보이니??")
 
 case class MteArgNumIncorrectExc(t: Type, argNum: Int)
   extends MteTypeExc(s"얘! 지금 어딜 감히 인수 ${argNum}개에 $t 타입 함수를 불러달라는 거니??")
+  
+case class MteUndefinedNameExc(msg: String) extends MteTypeExc(msg)

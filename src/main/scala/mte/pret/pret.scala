@@ -15,7 +15,7 @@ import scala.util.{Failure, Success}
  * @return 프로그램의 결과
  */
 private[mte] def run(expr: Expr): Value = {
-  typePret(expr, TEnv(Map(), Map()))
+  // typePret(expr, TEnv(Map(), Map()))
   pret(expr, Map())
 }
 
@@ -29,8 +29,17 @@ private def typePret(expr: Expr, tEnv: TEnv): Type = {
         case Success(value) => value
       }
     case TernaryOp(x, y, z, op, opName) => ???
-    case Id(name) => ???
-    case ValDef(id, t, _, next) => ???
+    case Id(name) => tEnv.vars.get(name) match {
+      case Some(value) => value
+      case None => throw MteUndefinedNameExc(
+        s"얘! 컴파일쟁이(${tEnv.vars})는 $name 이런 거 잘 몰라!!"
+      )
+    }
+    case ValDef(id, t, initExpr, next) =>
+      val initT: Type = typePret(initExpr, tEnv)
+      val tv: Type = typePret(t, tEnv)
+      tv :>! initT
+      typePret(next, tEnv.copy(vars = tEnv.vars + (id -> tv)))
     case Fun(funName, argName, argsT, retT, fExpr) => ???
     case App(fnExpr, argExpr) => ???
     case Tuple(data, types) => ???
@@ -39,8 +48,25 @@ private def typePret(expr: Expr, tEnv: TEnv): Type = {
     case Proj(obj, id) => ???
     case BoxDef(id, t, initExpr, next) => ???
     case BoxSet(box, setExpr) => ???
-    case Vec(data, t) => ???
-    case HMap(data, kT, vT) => ???
+    case Vec(data, t) =>
+      val tv: Type = typePret(t, tEnv)
+      for {
+        e <- data
+        v = typePret(e, tEnv)
+      } tv :>! v
+      VecTV(tv)
+    case HMap(data, kT, vT) =>
+      val kv: Type = typePret(kT, tEnv)
+      val vv: Type = typePret(vT, tEnv)
+      for {
+        (ke, ve) <- data
+        k = typePret(ke, tEnv)
+        v = typePret(ve, tEnv)
+      } {
+        kv ==! k
+        vv :>! v
+      }
+      HMapTV(kv, vv)
     case ClassDef(memberName, methods, typeName, next) => ???
   }
 }
@@ -57,11 +83,14 @@ private def typePret(ti: TypeInfo, tEnv: TEnv): Type = {
     case HMapT(k, v) => HMapTV(typePret(k, tEnv), typePret(v, tEnv))
     case ObjT(members, typeName) => ???
     case ForAllT(args, retT) => ???
-    case IdT(id) => ???
+    case IdT(id) => tEnv.typeIds.get(id) match {
+      case Some(value) => value
+      case None => ???
+    }
     case VarT(t) => t match {
       case Some(value) => typePret(value, tEnv)
-      case None => throw MteTypeUnsolvedException(
-        s"얘! 여기 지금 $ti 이게 무슨 타입인지를 내가 어떻게 알아!! 어딜 감히 개발자 나부랭탱이가 컴파일러랑 특수한 관계인 척을 하려고..."
+      case None => throw MteTypeUnsolvedExc(
+        s"얘! 여기 지금 $ti 이게 무슨 타입인지를 내가 어떻게 알아아아앍!! 어딜 감히 개발자 나부랭탱이가 컴파일러랑 특수한 관계인 척을 하려고..."
       )
     }
   }

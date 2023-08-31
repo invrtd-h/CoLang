@@ -6,9 +6,40 @@ import mte.expr._
 import mte.value._
 import mte.error._
 
-type Cont = Value => TailRec[Value]
+type ContFn = Value => TailRec[Value]
 
-def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
+private class Cont[R, U](data: (U => R) => R) {
+  def applyCont(f: U => R): R = data(f)
+
+  def map[U2](fn: U => U2): Cont[R, U2] = Cont(
+    (f: U2 => R) => applyCont(fn.andThen(f))
+  )
+
+  def flatMap[U2](fn: U => Cont[R, U2]): Cont[R, U2] = Cont(
+    (f: U2 => R) => applyCont(u => fn(u).applyCont(f))
+  )
+}
+
+def toCont[R, U](u: U): Cont[R, U] = Cont((f: U => R) => f(u))
+
+def addCPS(a: Int, b: Int): Cont[Int, Int] = toCont(a + b)
+def subCPS(a: Int, b: Int): Cont[Int, Int] = toCont(a - b)
+def mulCPS(a: Int, b: Int): Cont[Int, Int] = toCont(a * b)
+
+@main
+def main(): Unit = {
+  val ret = for {
+    v1 <- addCPS(1, 2)
+    v2 <- subCPS(7, 4)
+    v3 <- mulCPS(v1, v2)
+  } yield v3
+  println(ret.applyCont(x => x))
+}
+
+private def toCPS[T, U, R](f: T => U, c: Cont[R, U]): T => Cont[R, U] =
+  t => Cont(uToR => uToR(f(t)))
+
+def pret(expr: Expr, env: Env, cont: ContFn): TailRec[Value] = expr match {
   case Num(data) => tailcall(cont(NumV(data)))
   case StrE(data) => tailcall(cont(StrV(data)))
   case BinaryOp(lhs, rhs, op) => tailcall(
@@ -45,7 +76,11 @@ def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
     cont(ret)
   }
   case App(fnExpr, argExpr) => ???
-  case Seqn(lhs, rhs) => ???
+  case Seqn(lhs, rhs) => tailcall(
+    pret(lhs, env, * => tailcall(
+      pret(rhs, env, cont)
+    ))
+  )
   case WhileN0(cond, exprIn) => ???
   case Proj(obj, id) => ???
   case BoxDef(id, t, initExpr, next) => ???
@@ -56,4 +91,4 @@ def pret(expr: Expr, env: Env, cont: Cont): TailRec[Value] = expr match {
   case _ => ???
 }
 
-def run(expr: Expr): Value = pret(expr, Map(), x => done(x)).result
+private[mte] def run(expr: Expr): Value = pret(expr, Map(), x => done(x)).result

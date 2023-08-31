@@ -141,5 +141,5 @@ private def isSubtype(supertype: Type, subtype: Type): Boolean = supertype match
  * @param vars 변수 이름과 그 타입을 묶는 맵
  * @param typeIds 정의된 타입의 이름과 그 인스턴스를 묶는 맵
  */
-private[mte] case class TEnv(vars: Map[String, Type], typeIds: Map[String, Type])
+private[mte] case class TEnv(vars: Map[VarID, Type], typeIds: Map[VarID, Type])
 
