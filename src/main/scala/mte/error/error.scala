@@ -17,10 +17,6 @@ final case class MteRuntimeErr(private val message: String = "",
                                private val cause: Throwable = None.orNull)
   extends Exception(message, cause)
 
-final case class MteSyntaxErr(private val message: String = "",
-                              private val cause: Throwable = None.orNull)
-  extends Exception(message, cause)
-
 final case class MteUnexpectedErr(private val message: String = "",
                                   private val cause: Throwable = None.orNull)
   extends Exception(message, cause)
@@ -38,20 +34,20 @@ class MteExc(message: String) extends Exception(message) {
   def this() = this(null: String)
 }
 
-class MteRuntimeExc(msg: String) extends MteExc(msg)
+class MteRuntimeExc(msg: String = "") extends MteExc(msg)
 
-class MteSyntaxExc(msg: String) extends MteExc(msg)
+class MteSyntaxExc(msg: String = "") extends MteExc(msg)
 
-class MteTypeExc(msg: String) extends MteExc(msg)
+class MteTypeExc(msg: String = "") extends MteExc(msg)
 
-case class MteAssertionFailedException(msg: String) extends MteRuntimeExc(msg)
+case class MteAssertionFailedException(msg: String = "") extends MteRuntimeExc(msg)
 
-case class MteTypeUnsolvedExc(msg: String) extends MteSyntaxExc(msg)
+case class MteTypeUnsolvedExc(msg: String = "") extends MteSyntaxExc(msg)
 
-case class MteTypeNonMatchExc(t: Type, s: String)
+case class MteTypeNotMatchExc(t: Type, s: String)
   extends MteTypeExc(s"얘! 여기 지금 $t 이게 $s 분류의 타입으로 보이니??")
 
 case class MteArgNumIncorrectExc(t: Type, argNum: Int)
-  extends MteTypeExc(s"얘! 지금 어딜 감히 인수 ${argNum}개에 $t 타입 함수를 불러달라는 거니??")
+  extends MteTypeExc(s"얘! 지금 어딜 감히 인수 ${argNum}개에 $t 타입 함수를 불러달라는 거니?? 단가가 안 맞잖아 임마!!!")
   
-case class MteUndefinedNameExc(msg: String) extends MteTypeExc(msg)
+case class MteUndefinedIdExc(msg: String) extends MteTypeExc(msg)

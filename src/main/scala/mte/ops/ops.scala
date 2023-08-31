@@ -5,10 +5,10 @@ import scala.util.Right
 import scala.util.{Try, Success, Failure}
 
 import mte.expr.{BinaryOp, Expr, unitE}
-import mte.mtetype.{ArrowTV, HMapTV, NumTV, Type, VecTV, unitTV}
+import mte.mtetype.{ArrowT, HMapT, NumT, Type, VecT, unitT}
 import mte.value.{CloV, FOV, HMapV, NumV, Value, VecV, unitV}
 import mte.utility.{gtInt, geInt, logNot, AssertLen}
-import mte.error.{mteAssert, MteAssertionFailedException, MteTypeNonMatchExc, MteArgNumIncorrectExc}
+import mte.error.{mteAssert, MteAssertionFailedException, MteTypeNotMatchExc, MteArgNumIncorrectExc}
 
 type OpFn = (=> FOV, => FOV) => Either[String, FOV]
 type TypeOpFn = (Type, Type) => Try[Type]
@@ -48,9 +48,9 @@ private def liftUnaryOp(op: BigInt => BigInt): OpFn = {
 
 private def binaryTypeOp: TypeOpFn = {
   def ret(t: Type, u: Type): Try[Type] = for {
-    _ <- NumTV :>! t
-    _ <- NumTV :>! u
-  } yield NumTV
+    _ <- NumT :>! t
+    _ <- NumT :>! u
+  } yield NumT
 
   ret
 }
@@ -79,7 +79,7 @@ private[mte] def makeSqrtExpr(lhs: Expr): Expr = {
   }
 
   def sqrtT(t: Type, @unused x: Type): Try[Type] =
-    for {_ <- NumTV :>! t} yield NumTV
+    for {_ <- NumT :>! t} yield NumT
 
   BinaryOp(lhs, unitE, Op(sqrt, sqrtT, "sqrt"))
 }
@@ -98,7 +98,7 @@ private[mte] def makePrintExpr(x: Expr, template: String): Expr = {
 private[mte] def makeReadIntExpr: Expr = {
   def ret(@unused x: FOV, @unused y: FOV): Either[String, FOV] = Right(NumV(scala.io.StdIn.readInt))
 
-  def retT(@unused x: Type, @unused y: Type): Try[Type] = Success(NumTV)
+  def retT(@unused x: Type, @unused y: Type): Try[Type] = Success(NumT)
 
   BinaryOp(unitE, unitE, Op(ret, retT, "readInt"))
 }
@@ -114,7 +114,7 @@ private[mte] def makeAssertExpr(value: Expr): Expr = {
   }
 
   def myAssertT(t: Type, @unused u: Type): Try[Type] =
-    for (_ <- NumTV :>! t) yield unitTV
+    for (_ <- NumT :>! t) yield unitT
 
   BinaryOp(value, unitE, Op(myAssert, myAssertT, "assert"))
 }
@@ -137,18 +137,18 @@ private[mte] def makeAccessExpr(lhs: Expr, rhs: Expr): Expr = {
   }
 
   def accessT1(vecT: Type, idxT: Type): Try[Type] = for {
-    v <- VecTV.trySubtract(vecT)
-    _ <- NumTV :>! idxT
+    v <- VecT.trySubtract(vecT)
+    _ <- NumT :>! idxT
   } yield v
 
   def accessT2(hMapT: Type, keyT: Type): Try[Type] = for {
-    (k, v) <- HMapTV.trySubtract(hMapT)
+    (k, v) <- HMapT.trySubtract(hMapT)
     _ <- k ==! keyT
   } yield v
 
   def accessT(t: Type, u: Type): Try[Type] = accessT1(t, u) match {
     case Failure(_) => accessT2(t, u) match {
-      case Failure(_) => Failure(MteTypeNonMatchExc(t, "컨테이너"))
+      case Failure(_) => Failure(MteTypeNotMatchExc(t, "컨테이너"))
       case Success(value) => Success(value)
     }
     case Success(value) => Success(value)
@@ -166,7 +166,7 @@ private[mte] def makeVecFillExpr(sizeE: Expr, initE: Expr): Expr = {
   }
 
   def vecFillT(t: Type, u: Type): Try[Type] =
-    for (_ <- NumTV :>! t) yield VecTV(u)
+    for (_ <- NumT :>! t) yield VecT(u)
 
   BinaryOp(sizeE, initE, Op(vecFill, vecFillT, "vecFill"))
 }
@@ -183,7 +183,7 @@ private[mte] def makeVecIotaExpr(lbdInclusive: Expr, ubdExclusive: Expr): Expr =
   }
 
   def vecIotaT(t: Type, u: Type): Try[Type] =
-    for {_ <- NumTV :>! t; _ <- NumTV :>! u} yield VecTV(NumTV)
+    for {_ <- NumT :>! t; _ <- NumT :>! u} yield VecT(NumT)
 
   BinaryOp(lbdInclusive, ubdExclusive, Op(vecIota, vecIotaT, "vecIota"))
 }
@@ -202,8 +202,8 @@ private[mte] def makeExtExpr(lhs: Expr, rhs: Expr): Expr = {
   }
 
   def extT(vecT1: Type, vecT2: Type): Try[Type] = for {
-    t1 <- VecTV.trySubtract(vecT1)
-    t2 <- VecTV.trySubtract(vecT2)
+    t1 <- VecT.trySubtract(vecT1)
+    t2 <- VecT.trySubtract(vecT2)
     _ <- t1 :>! t2
   } yield vecT1
 
@@ -218,9 +218,9 @@ def makeSizeExpr(lhs: Expr, rhs: Expr): Expr = {
   }
 
   def sizeT(vecT: Type, numT: Type): Try[Type] = for {
-    _ <- VecTV.trySubtract(vecT)
-    _ <- NumTV :>! numT
-  } yield NumTV
+    _ <- VecT.trySubtract(vecT)
+    _ <- NumT :>! numT
+  } yield NumT
 
   BinaryOp(lhs, rhs, Op(size, sizeT, "size"))
 }
@@ -240,19 +240,19 @@ def makeVecDropRightExpr(vecE: Expr, dropNumE: Expr): Expr = {
   }
 
   def vecDropRightT(vecT: Type, numT: Type): Try[Type] = for {
-    _ <- VecTV.trySubtract(vecT)
-    _ <- NumTV :>! numT
+    _ <- VecT.trySubtract(vecT)
+    _ <- NumT :>! numT
   } yield vecT
 
   BinaryOp(vecE, dropNumE, Op(vecDropRight, vecDropRightT, "vecDropRight"))
 }
 
 private def vecFilterT(vecT: Type, fnT: Type): Try[Type] = for {
-  t <- VecTV.trySubtract(vecT)
-  (argTs, retT) <- ArrowTV.trySubtract(fnT)
+  t <- VecT.trySubtract(vecT)
+  (argTs, retT) <- ArrowT.trySubtract(fnT)
   _ <- mteAssert(argTs.length == 1, MteArgNumIncorrectExc(fnT, 1))
   _ <- argTs(0) :>! t
-  _ <- NumTV :>! retT
+  _ <- NumT :>! retT
 } yield vecT
 
 def makeVecFilterExpr(vec: Expr, fn: Expr): Expr = {
@@ -289,11 +289,11 @@ def makeVecMapExpr(vec: Expr, fn: Expr): Expr = {
   }
 
   def vecMapT(vecT: Type, fnT: Type): Try[Type] = for {
-    t <- VecTV.trySubtract(vecT)
-    (argTs, retT) <- ArrowTV.trySubtract(fnT)
+    t <- VecT.trySubtract(vecT)
+    (argTs, retT) <- ArrowT.trySubtract(fnT)
     _ <- mteAssert(argTs.length == 1, MteArgNumIncorrectExc(fnT, 1))
     _ <- argTs(0) :>! t
-  } yield VecTV(retT)
+  } yield VecT(retT)
 
   BinaryOp(vec, fn, Op(vecMap, vecMapT, "vecMap"))
 }
@@ -305,9 +305,9 @@ def makeHMapContainsExpr(hMap: Expr, v: Expr): Expr = {
   }
 
   def hMapContainsT(hMapT: Type, keyT: Type): Try[Type] = for {
-    (k, _) <- HMapTV :<- hMapT
+    (k, _) <- HMapT :<- hMapT
     _ <- k ==! keyT
-  } yield NumTV
+  } yield NumT
 
   BinaryOp(hMap, v, Op(hMapContains, hMapContainsT, "hMapContains"))
 }

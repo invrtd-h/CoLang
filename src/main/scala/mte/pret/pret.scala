@@ -21,8 +21,8 @@ private[mte] def run(expr: Expr): Value = {
 
 private def typePret(expr: Expr, tEnv: TEnv): Type = {
   expr match {
-    case Num(_) => NumTV
-    case StrE(_) => StrTV
+    case Num(_) => NumT
+    case StrE(_) => StrT
     case BinaryOp(lhs, rhs, op) =>
       op.calculateType(typePret(lhs, tEnv), typePret(rhs, tEnv)) match {
         case Failure(exception) => throw exception
@@ -31,7 +31,7 @@ private def typePret(expr: Expr, tEnv: TEnv): Type = {
     case TernaryOp(x, y, z, op, opName) => ???
     case Id(name) => tEnv.vars.get(name) match {
       case Some(value) => value
-      case None => throw MteUndefinedNameExc(
+      case None => throw MteUndefinedIdExc(
         s"얘! 컴파일쟁이(${tEnv.vars})는 $name 이런 거 잘 몰라!!"
       )
     }
@@ -54,7 +54,7 @@ private def typePret(expr: Expr, tEnv: TEnv): Type = {
         e <- data
         v = typePret(e, tEnv)
       } tv :>! v
-      VecTV(tv)
+      VecT(tv)
     case HMap(data, kT, vT) =>
       val kv: Type = typePret(kT, tEnv)
       val vv: Type = typePret(vT, tEnv)
@@ -66,28 +66,28 @@ private def typePret(expr: Expr, tEnv: TEnv): Type = {
         kv ==! k
         vv :>! v
       }
-      HMapTV(kv, vv)
+      HMapT(kv, vv)
     case ClassDef(memberName, methods, typeName, next) => ???
   }
 }
 
-private def typePret(ti: TypeInfo, tEnv: TEnv): Type = {
+private def typePret(ti: TypeExpr, tEnv: TEnv): Type = {
   ti match {
-    case NumT => NumTV
-    case StrT => StrTV
-    case ArrowT(args, ret) =>
-      ArrowTV(args.map(x => typePret(x, tEnv)), typePret(ret, tEnv))
-    case TupleT(types) =>
-      TupleTV(types.map(x => typePret(x, tEnv)))
-    case VecT(t) => VecTV(typePret(t, tEnv))
-    case HMapT(k, v) => HMapTV(typePret(k, tEnv), typePret(v, tEnv))
-    case ObjT(members, typeName) => ???
-    case ForAllT(args, retT) => ???
-    case IdT(id) => tEnv.typeIds.get(id) match {
+    case NumTE => NumT
+    case StrTE => StrT
+    case ArrowTE(args, ret) =>
+      ArrowT(args.map(x => typePret(x, tEnv)), typePret(ret, tEnv))
+    case TupleTE(types) =>
+      TupleT(types.map(x => typePret(x, tEnv)))
+    case VecTE(t) => VecT(typePret(t, tEnv))
+    case HMapTE(k, v) => HMapT(typePret(k, tEnv), typePret(v, tEnv))
+    case ObjTE(members, typeName) => ???
+    case ForAllTE(args, retT) => ???
+    case IdTE(id) => tEnv.typeIds.get(id) match {
       case Some(value) => value
       case None => ???
     }
-    case VarT(t) => t match {
+    case VarTE(t) => t match {
       case Some(value) => typePret(value, tEnv)
       case None => throw MteTypeUnsolvedExc(
         s"얘! 여기 지금 $ti 이게 무슨 타입인지를 내가 어떻게 알아아아앍!! 어딜 감히 개발자 나부랭탱이가 컴파일러랑 특수한 관계인 척을 하려고..."
@@ -107,7 +107,7 @@ private[mte] def pret(expr: Expr, env: Env): Value = {
   def fnCall(fnExpr: Expr, argExprs: Vector[Expr]): Value = pret(fnExpr, env) match {
     case CloV(argName, fExpr, fEnv) =>
       if (argName.length != argExprs.length) {
-        throw MteSyntaxErr()
+        throw MteSyntaxExc()
       }
       val argV: Vector[Value] = argExprs.map(x => pret(x, env).toFOV)
       pret(fExpr, fEnv ++ argName.zip(argV).toMap)

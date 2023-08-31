@@ -7,7 +7,7 @@ import mte.ops.{makeGtExpr, makeAddExpr}
 
 import scala.annotation.tailrec
 
-def exprToFn(expr: Expr): Expr = Fun(AnonFn1, Vector(), Vector(), VarT(), expr)
+def exprToFn(expr: Expr): Expr = Fun(AnonFn1, Vector(), Vector(), VarTE(), expr)
 
 def newScope(expr: Expr): Expr = App(exprToFn(expr), Vector())
 
@@ -28,7 +28,7 @@ def vecToSeq(vec: Vector[Expr]): Expr = {
   }
 }
 
-def newFor(iterName: String, iterT: TypeInfo, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
+def newFor(iterName: String, iterT: TypeExpr, initExpr: Expr, condExpr: Expr, manipulationExpr: Expr, inExpr: Expr): Expr = {
   BoxDef(StringID(iterName), iterT, initExpr, WhileN0(condExpr, Seqn(
     inExpr,
     manipulationExpr
@@ -37,7 +37,7 @@ def newFor(iterName: String, iterT: TypeInfo, initExpr: Expr, condExpr: Expr, ma
 
 def newSimpleFor(iterName: String, lbdInclusive: Expr, ubdExclusive: Expr, inExpr: Expr): Expr = newFor(
   iterName = iterName,
-  iterT = NumT,
+  iterT = NumTE,
   initExpr = lbdInclusive,
   condExpr = makeGtExpr(ubdExclusive, Id(StringID(iterName))),
   manipulationExpr = BoxSet(Id(StringID(iterName)), makeAddExpr(Id(StringID(iterName)), Num(1))),
