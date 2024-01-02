@@ -6,3 +6,5 @@ lazy val root = (project in file("."))
   .settings(
     name := "MTELang"
   )
+
+libraryDependencies += "org.scala-lang.modules" %% "scala-parser-combinators" % "2.3.0"

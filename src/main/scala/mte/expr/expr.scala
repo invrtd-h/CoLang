@@ -85,3 +85,7 @@ private[mte] case class ClassDef(memberName: Vector[StringID],
 }
 
 private[mte] sealed trait Cmd
+
+private[mte] case object SkipC extends Cmd
+
+private[mte] case class SeqC(c1: Cmd, c2: Cmd) extends Cmd
