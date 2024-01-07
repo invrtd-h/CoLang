@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="새 브랜치 를! 만든 나">
-      <change afterPath="$PROJECT_DIR$/src/main/scala/mte2/Expr.scala" afterDir="false" />
+    <list default="true" id="cd7406c7-b1c8-4846-aead-6eb02ae36fa8" name="Changes" comment="파서 만드는 법을 배우는 나">
+      <change afterPath="$PROJECT_DIR$/src/main/scala/mte2/syntax.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/build.sbt" beforeDir="false" afterPath="$PROJECT_DIR$/build.sbt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/experimental/typesys/typesys.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/experimental/typesys/typesys.scala" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte/expr/expr.scala" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/scala/mte2/Expr.scala" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/scala/mte2/Expr.scala" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -177,14 +175,8 @@
       <workItem from="1696863122739" duration="598000" />
       <workItem from="1699013049361" duration="3265000" />
       <workItem from="1699284769056" duration="598000" />
-      <workItem from="1700641326151" duration="4879000" />
-    </task>
-    <task id="LOCAL-00004" summary="input 키워드 &quot;개입&quot; 추가">
-      <created>1689408716756</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1689408716756</updated>
+      <workItem from="1700641326151" duration="10194000" />
+      <workItem from="1704296865557" duration="8956000" />
     </task>
     <task id="LOCAL-00005" summary="input 키워드 &quot;개입&quot; 추가">
       <created>1689415066480</created>
@@ -522,7 +514,14 @@
       <option name="project" value="LOCAL" />
       <updated>1693448340666</updated>
     </task>
-    <option name="localTasksCounter" value="53" />
+    <task id="LOCAL-00053" summary="파서 만드는 법을 배우는 나">
+      <created>1704212112507</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
+      <option name="project" value="LOCAL" />
+      <updated>1704212112508</updated>
+    </task>
+    <option name="localTasksCounter" value="54" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -540,7 +539,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Box oriented로 돌아감" />
     <MESSAGE value="for문 scope 처리 적용" />
     <MESSAGE value="다변수함수 및 키워드 묶음 추가" />
     <MESSAGE value="키워드 '달려가' 추가" />
@@ -565,7 +563,8 @@
     <MESSAGE value="타입 정보 추가" />
     <MESSAGE value="마이너한 이름 이슈 를! 수정한 나" />
     <MESSAGE value="새 브랜치 를! 만든 나" />
-    <option name="LAST_COMMIT_MESSAGE" value="새 브랜치 를! 만든 나" />
+    <MESSAGE value="파서 만드는 법을 배우는 나" />
+    <option name="LAST_COMMIT_MESSAGE" value="파서 만드는 법을 배우는 나" />
   </component>
   <component name="VgoProject">
     <settings-migrated>true</settings-migrated>

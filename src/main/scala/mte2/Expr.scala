@@ -25,16 +25,6 @@ object Expr extends RegexParsers {
   private def wrapC[T](e: Parser[T]): Parser[T] = "{" ~> e <~ "}"
   private def wrapS[T](e: Parser[T]): Parser[T] = "[" ~> e <~ "]"
 
-  val keywords: Set[String] = Set(
-    "춘잣",
-    // 조사
-    "은", "는", "을", "를",
-    // primitive
-    "스킵이야", "스키비야", "뭉", "탱",
-    // 변수 정의
-    "아니", "세상에", "자기가", "라는", "사람인데", "했대",
-  )
-
   private lazy val n: Parser[BigInt] = "-?[0-9]+".r ^^ BigInt.apply
 
   private lazy val e: Parser[Expr] = {
@@ -59,4 +49,5 @@ def pret(expr: Expr): BigInt = expr match {
 def main(): Unit = {
   println(pret(Expr("43")))
   println(pret(Expr("4+3")))
+  println(pret(Expr("4 + 3")))
 }
